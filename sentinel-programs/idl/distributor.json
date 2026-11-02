@@ -1,0 +1,2075 @@
+{
+  "address": "SentineLDistributor111111111111111111111111",
+  "metadata": {
+    "name": "distributor",
+    "version": "0.1.0",
+    "spec": "0.1.0"
+  },
+  "instructions": [
+    {
+      "name": "claim",
+      "discriminator": [
+        62,
+        198,
+        214,
+        193,
+        213,
+        159,
+        108,
+        210
+      ],
+      "accounts": [
+        {
+          "name": "rent_payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "beneficiary"
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "roots",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  111,
+                  116,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "bitmap",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  97,
+                  105,
+                  109,
+                  95,
+                  98,
+                  105,
+                  116,
+                  109,
+                  97,
+                  112
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "args.shard_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "beneficiary_token",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "beneficiary"
+              },
+              {
+                "kind": "account",
+                "path": "token_program"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "vesting_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  101,
+                  115,
+                  116,
+                  105,
+                  110,
+                  103,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "args.shard_id"
+              },
+              {
+                "kind": "arg",
+                "path": "args.leaf_index"
+              }
+            ]
+          }
+        },
+        {
+          "name": "schedule_buffer",
+          "writable": true,
+          "optional": true
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "ClaimArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "close_bitmap",
+      "discriminator": [
+        59,
+        123,
+        115,
+        204,
+        163,
+        227,
+        37,
+        118
+      ],
+      "accounts": [
+        {
+          "name": "upgrade_authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "program",
+          "address": "SentineLDistributor111111111111111111111111"
+        },
+        {
+          "name": "program_data"
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "bitmap",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  97,
+                  105,
+                  109,
+                  95,
+                  98,
+                  105,
+                  116,
+                  109,
+                  97,
+                  112
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "shard_id"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "shard_id",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "finalize_genesis",
+      "discriminator": [
+        14,
+        52,
+        206,
+        170,
+        165,
+        216,
+        46,
+        149
+      ],
+      "accounts": [
+        {
+          "name": "upgrade_authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "program",
+          "address": "SentineLDistributor111111111111111111111111"
+        },
+        {
+          "name": "program_data"
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "roots",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  111,
+                  116,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "vault"
+        },
+        {
+          "name": "treasury"
+        }
+      ],
+      "args": [
+        {
+          "name": "expected_roots_commitment",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "initialize_bitmap",
+      "discriminator": [
+        25,
+        109,
+        200,
+        45,
+        209,
+        118,
+        74,
+        69
+      ],
+      "accounts": [
+        {
+          "name": "upgrade_authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "program",
+          "address": "SentineLDistributor111111111111111111111111"
+        },
+        {
+          "name": "program_data"
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "bitmap",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  97,
+                  105,
+                  109,
+                  95,
+                  98,
+                  105,
+                  116,
+                  109,
+                  97,
+                  112
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "shard_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "shard_id",
+          "type": "u16"
+        },
+        {
+          "name": "leaf_count",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "initialize_config",
+      "discriminator": [
+        208,
+        127,
+        21,
+        1,
+        194,
+        190,
+        196,
+        70
+      ],
+      "accounts": [
+        {
+          "name": "upgrade_authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "program",
+          "address": "SentineLDistributor111111111111111111111111"
+        },
+        {
+          "name": "program_data"
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+        },
+        {
+          "name": "vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault"
+        },
+        {
+          "name": "treasury"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "total_claimable",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "initialize_roots",
+      "discriminator": [
+        145,
+        210,
+        34,
+        39,
+        185,
+        16,
+        103,
+        223
+      ],
+      "accounts": [
+        {
+          "name": "upgrade_authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "program",
+          "address": "SentineLDistributor111111111111111111111111"
+        },
+        {
+          "name": "program_data"
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "roots",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  111,
+                  116,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "set_total_claimable",
+      "discriminator": [
+        113,
+        25,
+        20,
+        124,
+        38,
+        16,
+        57,
+        18
+      ],
+      "accounts": [
+        {
+          "name": "upgrade_authority",
+          "signer": true
+        },
+        {
+          "name": "program",
+          "address": "SentineLDistributor111111111111111111111111"
+        },
+        {
+          "name": "program_data"
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "total_claimable",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "stage_abandon",
+      "discriminator": [
+        161,
+        30,
+        126,
+        206,
+        122,
+        243,
+        103,
+        41
+      ],
+      "accounts": [
+        {
+          "name": "rent_payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "schedule_buffer",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  99,
+                  104,
+                  101,
+                  100,
+                  117,
+                  108,
+                  101,
+                  95,
+                  98,
+                  117,
+                  102,
+                  102,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "shard_id"
+              },
+              {
+                "kind": "arg",
+                "path": "leaf_index"
+              },
+              {
+                "kind": "account",
+                "path": "rent_payer"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "shard_id",
+          "type": "u16"
+        },
+        {
+          "name": "leaf_index",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "stage_finalize",
+      "discriminator": [
+        179,
+        50,
+        30,
+        159,
+        103,
+        17,
+        219,
+        198
+      ],
+      "accounts": [
+        {
+          "name": "rent_payer",
+          "signer": true
+        },
+        {
+          "name": "schedule_buffer",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  99,
+                  104,
+                  101,
+                  100,
+                  117,
+                  108,
+                  101,
+                  95,
+                  98,
+                  117,
+                  102,
+                  102,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "shard_id"
+              },
+              {
+                "kind": "arg",
+                "path": "leaf_index"
+              },
+              {
+                "kind": "account",
+                "path": "rent_payer"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "shard_id",
+          "type": "u16"
+        },
+        {
+          "name": "leaf_index",
+          "type": "u32"
+        },
+        {
+          "name": "digest",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "stage_init",
+      "discriminator": [
+        4,
+        92,
+        227,
+        6,
+        39,
+        161,
+        170,
+        24
+      ],
+      "accounts": [
+        {
+          "name": "rent_payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "schedule_buffer",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  99,
+                  104,
+                  101,
+                  100,
+                  117,
+                  108,
+                  101,
+                  95,
+                  98,
+                  117,
+                  102,
+                  102,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "shard_id"
+              },
+              {
+                "kind": "arg",
+                "path": "leaf_index"
+              },
+              {
+                "kind": "account",
+                "path": "rent_payer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "shard_id",
+          "type": "u16"
+        },
+        {
+          "name": "leaf_index",
+          "type": "u32"
+        },
+        {
+          "name": "schedule_len",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "stage_write",
+      "discriminator": [
+        223,
+        105,
+        21,
+        216,
+        20,
+        119,
+        242,
+        211
+      ],
+      "accounts": [
+        {
+          "name": "rent_payer",
+          "signer": true
+        },
+        {
+          "name": "schedule_buffer",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  99,
+                  104,
+                  101,
+                  100,
+                  117,
+                  108,
+                  101,
+                  95,
+                  98,
+                  117,
+                  102,
+                  102,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "shard_id"
+              },
+              {
+                "kind": "arg",
+                "path": "leaf_index"
+              },
+              {
+                "kind": "account",
+                "path": "rent_payer"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "shard_id",
+          "type": "u16"
+        },
+        {
+          "name": "leaf_index",
+          "type": "u32"
+        },
+        {
+          "name": "offset",
+          "type": "u32"
+        },
+        {
+          "name": "bytes",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "sweep_vault_excess",
+      "discriminator": [
+        68,
+        191,
+        12,
+        9,
+        188,
+        16,
+        49,
+        42
+      ],
+      "accounts": [
+        {
+          "name": "upgrade_authority",
+          "signer": true
+        },
+        {
+          "name": "program",
+          "address": "SentineLDistributor111111111111111111111111"
+        },
+        {
+          "name": "program_data"
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "treasury",
+          "writable": true
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "withdraw_vested",
+      "discriminator": [
+        104,
+        188,
+        52,
+        194,
+        35,
+        234,
+        95,
+        149
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "vesting_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  101,
+                  115,
+                  116,
+                  105,
+                  110,
+                  103,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "shard_id"
+              },
+              {
+                "kind": "arg",
+                "path": "leaf_index"
+              }
+            ]
+          }
+        },
+        {
+          "name": "beneficiary"
+        },
+        {
+          "name": "rent_recipient",
+          "writable": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "beneficiary_token",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "beneficiary"
+              },
+              {
+                "kind": "account",
+                "path": "token_program"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "shard_id",
+          "type": "u16"
+        },
+        {
+          "name": "leaf_index",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "write_roots_chunk",
+      "discriminator": [
+        233,
+        140,
+        144,
+        252,
+        182,
+        144,
+        166,
+        47
+      ],
+      "accounts": [
+        {
+          "name": "upgrade_authority",
+          "signer": true
+        },
+        {
+          "name": "program",
+          "address": "SentineLDistributor111111111111111111111111"
+        },
+        {
+          "name": "program_data"
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "roots",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  111,
+                  116,
+                  115
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "start_index",
+          "type": "u16"
+        },
+        {
+          "name": "chunk",
+          "type": {
+            "vec": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "ClaimBitmap",
+      "discriminator": [
+        61,
+        25,
+        148,
+        196,
+        164,
+        208,
+        65,
+        169
+      ]
+    },
+    {
+      "name": "Config",
+      "discriminator": [
+        155,
+        12,
+        170,
+        224,
+        30,
+        250,
+        204,
+        130
+      ]
+    },
+    {
+      "name": "Roots",
+      "discriminator": [
+        200,
+        234,
+        136,
+        233,
+        236,
+        141,
+        75,
+        0
+      ]
+    },
+    {
+      "name": "ScheduleBuffer",
+      "discriminator": [
+        125,
+        81,
+        14,
+        2,
+        210,
+        241,
+        6,
+        27
+      ]
+    },
+    {
+      "name": "VestingState",
+      "discriminator": [
+        225,
+        34,
+        190,
+        79,
+        98,
+        226,
+        144,
+        101
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "LeafClaimed",
+      "discriminator": [
+        201,
+        153,
+        186,
+        247,
+        43,
+        192,
+        163,
+        37
+      ]
+    },
+    {
+      "name": "VestedWithdrawn",
+      "discriminator": [
+        105,
+        42,
+        140,
+        91,
+        39,
+        128,
+        244,
+        57
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "Unauthorized",
+      "msg": "signer is not the program upgrade authority"
+    },
+    {
+      "code": 6001,
+      "name": "ConfigAlreadyFinalized",
+      "msg": "genesis already finalized"
+    },
+    {
+      "code": 6002,
+      "name": "ConfigNotFinalized",
+      "msg": "genesis not finalized"
+    },
+    {
+      "code": 6003,
+      "name": "RootsCommitmentMismatch",
+      "msg": "recomputed roots commitment does not match the expected value"
+    },
+    {
+      "code": 6004,
+      "name": "VaultBalanceMismatch",
+      "msg": "vault balance does not equal claimable total"
+    },
+    {
+      "code": 6005,
+      "name": "SupplyMismatch",
+      "msg": "treasury + vault does not equal mint supply"
+    },
+    {
+      "code": 6006,
+      "name": "MintNotSealed",
+      "msg": "mint authority or freeze authority is still set"
+    },
+    {
+      "code": 6007,
+      "name": "ChunkOutOfRange",
+      "msg": "roots chunk out of range"
+    },
+    {
+      "code": 6008,
+      "name": "BitmapCountMismatch",
+      "msg": "not all SHARD_COUNT shard bitmaps were created"
+    },
+    {
+      "code": 6009,
+      "name": "MintDecimalsMismatch",
+      "msg": "mint has unexpected decimals"
+    },
+    {
+      "code": 6010,
+      "name": "LeafIndexOutOfRange",
+      "msg": "leaf index past the bitmap's capacity"
+    },
+    {
+      "code": 6011,
+      "name": "ShardIdOutOfRange",
+      "msg": "shard_id out of range"
+    },
+    {
+      "code": 6012,
+      "name": "ShardLeafCountTooLarge",
+      "msg": "leaf_count exceeds the builder's per-shard cap"
+    },
+    {
+      "code": 6013,
+      "name": "ShardIdMismatch",
+      "msg": "shard identifier does not match the expected shard"
+    },
+    {
+      "code": 6014,
+      "name": "InvalidBech32Address",
+      "msg": "bech32 address is malformed or non-canonical"
+    },
+    {
+      "code": 6015,
+      "name": "InvalidSignature",
+      "msg": "signature is malformed, high-S, or does not recover"
+    },
+    {
+      "code": 6016,
+      "name": "InvalidProof",
+      "msg": "merkle proof does not verify against the shard root"
+    },
+    {
+      "code": 6017,
+      "name": "LeafAlreadyClaimed",
+      "msg": "leaf has already been claimed"
+    },
+    {
+      "code": 6018,
+      "name": "UnexpectedSchedule",
+      "msg": "a schedule was supplied for a liquid-only (locked_amount == 0) leaf"
+    },
+    {
+      "code": 6019,
+      "name": "MissingSchedule",
+      "msg": "a locked leaf requires a schedule"
+    },
+    {
+      "code": 6020,
+      "name": "ScheduleHashMismatch",
+      "msg": "recomputed schedule hash does not match the leaf's vesting_schedule_hash"
+    },
+    {
+      "code": 6021,
+      "name": "InvalidSchedule",
+      "msg": "schedule shape is invalid"
+    },
+    {
+      "code": 6022,
+      "name": "ArithmeticOverflow",
+      "msg": "integer overflow"
+    },
+    {
+      "code": 6023,
+      "name": "WithdrawableZero",
+      "msg": "nothing newly unlocked to withdraw"
+    },
+    {
+      "code": 6024,
+      "name": "BufferNotFinalized",
+      "msg": "a claim's schedule buffer has not been finalized"
+    },
+    {
+      "code": 6025,
+      "name": "BufferAlreadyFinalized",
+      "msg": "a schedule buffer is already finalized"
+    },
+    {
+      "code": 6026,
+      "name": "BufferDigestMismatch",
+      "msg": "stage_finalize digest does not match the staged schedule bytes"
+    },
+    {
+      "code": 6027,
+      "name": "BufferOutOfRange",
+      "msg": "stage_write offset/length is out of the buffer's bounds"
+    },
+    {
+      "code": 6028,
+      "name": "BufferSeedsMismatch",
+      "msg": "schedule buffer account is not the canonical PDA for its own recorded rent payer"
+    },
+    {
+      "code": 6029,
+      "name": "InvalidScheduleBytes",
+      "msg": "staged schedule bytes failed to decode as a canonical preimage"
+    },
+    {
+      "code": 6030,
+      "name": "BufferTooLarge",
+      "msg": "staged schedule length exceeds the 512-period cap"
+    },
+    {
+      "code": 6031,
+      "name": "MintExtensionForbidden",
+      "msg": "mint carries a token extension outside the launch allowlist"
+    },
+    {
+      "code": 6032,
+      "name": "InvalidMint",
+      "msg": "mint account data is not a readable Token/Token-2022 mint"
+    },
+    {
+      "code": 6033,
+      "name": "BitmapSizeMismatch",
+      "msg": "bitmap allocation does not match the recorded leaf count"
+    },
+    {
+      "code": 6034,
+      "name": "InvalidTreasury",
+      "msg": "vault and treasury must not be the same token account"
+    },
+    {
+      "code": 6035,
+      "name": "InvalidBeneficiary",
+      "msg": "beneficiary must not be the zero public key"
+    },
+    {
+      "code": 6036,
+      "name": "InvalidStoredSchedule",
+      "msg": "stored schedule no longer passes validation"
+    },
+    {
+      "code": 6037,
+      "name": "IdentityMismatch",
+      "msg": "recovered public key does not hash to the claimed address"
+    },
+    {
+      "code": 6038,
+      "name": "VaultNotClean",
+      "msg": "vault is frozen or carries a delegate or close authority"
+    },
+    {
+      "code": 6039,
+      "name": "VaultExcessZero",
+      "msg": "vault holds no excess above the claimable total"
+    },
+    {
+      "code": 6040,
+      "name": "TokenProgramMismatch",
+      "msg": "token_program is not Token-2022 or does not own the mint"
+    }
+  ],
+  "types": [
+    {
+      "name": "ClaimArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "shard_id",
+            "type": "u16"
+          },
+          {
+            "name": "leaf_index",
+            "type": "u32"
+          },
+          {
+            "name": "bech32_address",
+            "type": "string"
+          },
+          {
+            "name": "liquid_amount",
+            "type": "u64"
+          },
+          {
+            "name": "locked_amount",
+            "type": "u64"
+          },
+          {
+            "name": "vesting_schedule_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "proof",
+            "type": {
+              "vec": {
+                "array": [
+                  "u8",
+                  32
+                ]
+              }
+            }
+          },
+          {
+            "name": "signature",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          },
+          {
+            "name": "recovery_id",
+            "type": "u8"
+          },
+          {
+            "name": "schedule",
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "Schedule"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ClaimBitmap",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "shard_id",
+            "type": "u16"
+          },
+          {
+            "name": "bits",
+            "type": "bytes"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Config",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "upgrade_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "vault_authority_bump",
+            "type": "u8"
+          },
+          {
+            "name": "roots_commitment",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "total_claimable",
+            "type": "u64"
+          },
+          {
+            "name": "bitmap_count",
+            "type": "u16"
+          },
+          {
+            "name": "finalized",
+            "type": "bool"
+          },
+          {
+            "name": "leaf_counts",
+            "type": {
+              "array": [
+                "u32",
+                128
+              ]
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "token_program",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LeafClaimed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "shard_id",
+            "type": "u16"
+          },
+          {
+            "name": "leaf_index",
+            "type": "u32"
+          },
+          {
+            "name": "beneficiary",
+            "type": "pubkey"
+          },
+          {
+            "name": "liquid_amount",
+            "type": "u64"
+          },
+          {
+            "name": "locked_amount",
+            "type": "u64"
+          },
+          {
+            "name": "folded",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Period",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "length_seconds",
+            "docs": [
+              "Length of the period in seconds."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Roots",
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "shard_roots",
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u8",
+                    32
+                  ]
+                },
+                128
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Schedule",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "kind",
+            "type": {
+              "defined": {
+                "name": "ScheduleKind"
+              }
+            }
+          },
+          {
+            "name": "start_at",
+            "docs": [
+              "Unix seconds."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "end_at",
+            "docs": [
+              "Unix seconds."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "periods",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "Period"
+                }
+              }
+            }
+          },
+          {
+            "name": "total",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ScheduleBuffer",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "rent_payer",
+            "type": "pubkey"
+          },
+          {
+            "name": "schedule_bytes",
+            "type": "bytes"
+          },
+          {
+            "name": "finalized",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ScheduleKind",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Continuous"
+          },
+          {
+            "name": "Delayed"
+          },
+          {
+            "name": "Periodic"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VestedWithdrawn",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "shard_id",
+            "type": "u16"
+          },
+          {
+            "name": "leaf_index",
+            "type": "u32"
+          },
+          {
+            "name": "beneficiary",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "closed",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VestingState",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "beneficiary",
+            "type": "pubkey"
+          },
+          {
+            "name": "bech32_address",
+            "type": "string"
+          },
+          {
+            "name": "compressed_public_key",
+            "type": {
+              "array": [
+                "u8",
+                33
+              ]
+            }
+          },
+          {
+            "name": "total",
+            "type": "u64"
+          },
+          {
+            "name": "withdrawn",
+            "type": "u64"
+          },
+          {
+            "name": "schedule",
+            "type": {
+              "defined": {
+                "name": "Schedule"
+              }
+            }
+          },
+          {
+            "name": "rent_payer",
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}

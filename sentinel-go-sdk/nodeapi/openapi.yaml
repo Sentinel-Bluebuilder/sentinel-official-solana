@@ -1,0 +1,1175 @@
+openapi: 3.0.3
+info:
+  title: Sentinel dVPN node API
+  version: "1"
+paths:
+  /v1/health:
+    get:
+      operationId: getHealth
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        default:
+          $ref: "#/components/responses/Error"
+  /v1/metadata:
+    get:
+      operationId: getMetadata
+      responses:
+        "200":
+          description: signed metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignedMessage"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        default:
+          $ref: "#/components/responses/Error"
+  /v1/sessions:
+    post:
+      operationId: openSession
+      security:
+        - SentinelSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OpenSessionRequest"
+      responses:
+        "200":
+          description: session opened
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpenSessionResponse"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        default:
+          $ref: "#/components/responses/Error"
+  /v1/sessions/{id}:
+    get:
+      operationId: getSession
+      security:
+        - SentinelSignature: []
+      parameters:
+        - $ref: "#/components/parameters/SessionID"
+      responses:
+        "200":
+          description: session state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        default:
+          $ref: "#/components/responses/Error"
+    delete:
+      operationId: closeSession
+      security:
+        - SentinelSignature: []
+      parameters:
+        - $ref: "#/components/parameters/SessionID"
+      responses:
+        "204":
+          description: closed
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        default:
+          $ref: "#/components/responses/Error"
+  /v1/sessions/{id}/events:
+    get:
+      operationId: getSessionEvents
+      security:
+        - SentinelSignature: []
+      parameters:
+        - $ref: "#/components/parameters/SessionID"
+      responses:
+        "200":
+          description: session events
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        default:
+          $ref: "#/components/responses/Error"
+  /v1/channels/{channel}:
+    get:
+      operationId: getChannel
+      security:
+        - SentinelSignature: []
+      parameters:
+        - $ref: "#/components/parameters/ChannelAddress"
+      responses:
+        "200":
+          description: channel state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Position"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        default:
+          $ref: "#/components/responses/Error"
+  /v1/channels/{channel}/vouchers:
+    post:
+      operationId: sendChannelVoucher
+      security:
+        - SentinelSignature: []
+      parameters:
+        - $ref: "#/components/parameters/ChannelAddress"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendVoucherRequest"
+      responses:
+        "200":
+          description: accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendVoucherResponse"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        default:
+          $ref: "#/components/responses/Error"
+  /v1/leases/{lease}/vouchers:
+    post:
+      operationId: sendLeaseVoucher
+      security:
+        - SentinelSignature: []
+      parameters:
+        - $ref: "#/components/parameters/LeaseAddress"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendVoucherRequest"
+      responses:
+        "200":
+          description: accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendVoucherResponse"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        default:
+          $ref: "#/components/responses/Error"
+  /v1/leases/{lease}:
+    get:
+      operationId: getLease
+      security:
+        - SentinelSignature: []
+      parameters:
+        - $ref: "#/components/parameters/LeaseAddress"
+      responses:
+        "200":
+          description: lease state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Position"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        default:
+          $ref: "#/components/responses/Error"
+  /v1/leases/{lease}/events:
+    get:
+      operationId: getLeaseEvents
+      security:
+        - SentinelSignature: []
+      parameters:
+        - $ref: "#/components/parameters/LeaseAddress"
+      responses:
+        "200":
+          description: lease events
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        default:
+          $ref: "#/components/responses/Error"
+components:
+  securitySchemes:
+    SentinelSignature:
+      type: apiKey
+      in: header
+      name: X-Sentinel-Signature
+      description: >
+        Base64 Ed25519 signature over the method, path, body, nonce, and timestamp under the
+        domain sha256 of the string sentinel-dvpn/api-request/v1. Requires the companion headers
+        X-Sentinel-Signer (base58 signer public key), X-Sentinel-Nonce (16 random bytes, base64),
+        and X-Sentinel-Timestamp (unix seconds); the server rejects a timestamp outside the allowed clock skew and a nonce it has
+        already seen.
+  parameters:
+    ChannelAddress:
+      name: channel
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/PublicKey"
+    LeaseAddress:
+      name: lease
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/PublicKey"
+    SessionID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        maxLength: 36
+        pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+  responses:
+    Error:
+      description: error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    TooManyRequests:
+      description: rate limited
+      headers:
+        Retry-After:
+          required: true
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+  schemas:
+    PublicKey:
+      type: string
+      pattern: '^[1-9A-HJ-NP-Za-km-z]{32,44}$'
+      x-go-type: solana.PublicKey
+      x-go-type-import:
+        path: github.com/solana-foundation/solana-go/v2
+        name: solana
+    SignedMessage:
+      type: object
+      additionalProperties: false
+      required: [payload, signature, signer]
+      properties:
+        payload:
+          type: object
+          maxProperties: 32
+        signature:
+          type: string
+          format: byte
+          minLength: 88
+          maxLength: 88
+        signer:
+          $ref: "#/components/schemas/PublicKey"
+      x-go-type: auth.SignedMessage
+      x-go-type-import:
+        path: github.com/sentinel-official/sentinel-go-sdk/v3/auth
+    ErrorCode:
+      type: string
+      enum:
+        - bad_request
+        - channel_node_stale
+        - channel_not_open
+        - client_closed_request
+        - conflict
+        - internal
+        - invalid_subscription
+        - invalid_ticket
+        - invalid_voucher_signature
+        - lease_not_funded
+        - method_not_allowed
+        - mode_not_stream
+        - mode_not_voucher
+        - not_found
+        - peer_limit_reached
+        - prepay_below_minimum
+        - rate_limited
+        - request_too_large
+        - session_not_found
+        - terms_rejected
+        - unauthorized
+        - voucher_exceeds_escrow
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message]
+          properties:
+            code:
+              $ref: "#/components/schemas/ErrorCode"
+            message:
+              type: string
+              maxLength: 256
+              pattern: '^[\x20-\x7e]*$'
+      x-go-type: api.ErrorResponse
+      x-go-type-import:
+        path: github.com/sentinel-official/sentinel-go-sdk/v3/api
+    Terms:
+      type: object
+      additionalProperties: false
+      required: [basis, price]
+      properties:
+        basis:
+          type: string
+          enum: [per_gb, per_hour]
+        price:
+          type: integer
+          format: uint64
+          minimum: 0
+          maximum: 9223372036854775807
+      x-go-type: session.Terms
+      x-go-type-import:
+        path: github.com/sentinel-official/sentinel-go-sdk/v3/session
+    Usage:
+      type: object
+      additionalProperties: false
+      required: [rx_bytes, seconds, tx_bytes]
+      properties:
+        rx_bytes:
+          type: integer
+          format: uint64
+          minimum: 0
+        seconds:
+          type: integer
+          format: uint64
+          minimum: 0
+        tx_bytes:
+          type: integer
+          format: uint64
+          minimum: 0
+      x-go-type: session.Usage
+      x-go-type-import:
+        path: github.com/sentinel-official/sentinel-go-sdk/v3/session
+    Ledger:
+      type: object
+      additionalProperties: false
+      required: [basis, cumulative_base_units, escrow_base_units, opened_at, price, redeemed_base_units, status]
+      properties:
+        basis:
+          type: string
+          enum: [per_gb, per_hour]
+          x-go-type: session.Basis
+          x-go-type-import:
+            path: github.com/sentinel-official/sentinel-go-sdk/v3/session
+        cumulative_base_units:
+          type: integer
+          format: uint64
+          minimum: 0
+        escrow_base_units:
+          type: integer
+          format: uint64
+          minimum: 0
+        opened_at:
+          type: integer
+          format: int64
+          minimum: 0
+        price:
+          type: integer
+          format: uint64
+          minimum: 0
+          maximum: 9223372036854775807
+        redeemed_base_units:
+          type: integer
+          format: uint64
+          minimum: 0
+        signature:
+          type: string
+          format: byte
+          maxLength: 88
+          x-go-type-skip-optional-pointer: true
+        status:
+          type: string
+          enum: [open, closing, closed]
+    Consumption:
+      type: object
+      additionalProperties: false
+      required: [owed_base_units, settled_base_units, usage]
+      properties:
+        owed_base_units:
+          type: integer
+          format: uint64
+          minimum: 0
+        settled_base_units:
+          type: integer
+          format: uint64
+          minimum: 0
+        usage:
+          $ref: "#/components/schemas/Usage"
+    Position:
+      type: object
+      additionalProperties: false
+      required: [consumption, ledger]
+      properties:
+        consumption:
+          $ref: "#/components/schemas/Consumption"
+        ledger:
+          $ref: "#/components/schemas/Ledger"
+    VoucherRequestEvent:
+      type: object
+      additionalProperties: false
+      required: [consumption, ledger]
+      properties:
+        consumption:
+          $ref: "#/components/schemas/Consumption"
+        ledger:
+          $ref: "#/components/schemas/Ledger"
+    ClosedReason:
+      type: string
+      enum:
+        - closed by client
+        - close grace elapsed
+        - credit exhausted
+        - data cap reached
+        - idle
+        - lease not funded
+        - no enforcer
+        - closed by operator
+        - position closed on chain
+        - position closing
+        - replaced
+        - retrying close
+        - ticket expired
+      x-enum-varnames:
+        - ClosedReasonClient
+        - ClosedReasonCloseGrace
+        - ClosedReasonCreditExhausted
+        - ClosedReasonDataCapReached
+        - ClosedReasonIdle
+        - ClosedReasonLeaseNotFunded
+        - ClosedReasonNoEnforcer
+        - ClosedReasonOperator
+        - ClosedReasonPositionClosed
+        - ClosedReasonPositionClosing
+        - ClosedReasonReplaced
+        - ClosedReasonRetry
+        - ClosedReasonTicketExpired
+    ClosedEvent:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason:
+          $ref: "#/components/schemas/ClosedReason"
+    ServiceType:
+      type: string
+      pattern: "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+      maxLength: 32
+    WireGuardPeerRequest:
+      type: object
+      required: [public_key]
+      properties:
+        public_key:
+          type: string
+          pattern: '^[A-Za-z0-9+/]{43}=$'
+    WireGuardPeerResponse:
+      type: object
+      required: [addresses, mtu, port, public_key]
+      properties:
+        addresses:
+          type: array
+          minItems: 1
+          maxItems: 8
+          items:
+            type: string
+        mtu:
+          type: integer
+          format: int32
+          minimum: 1280
+          maximum: 65535
+        port:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 65535
+        public_key:
+          type: string
+          pattern: '^[A-Za-z0-9+/]{43}=$'
+    WireGuardMetadata:
+      type: object
+      required: [port, public_key]
+      properties:
+        port:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 65535
+        public_key:
+          type: string
+          pattern: '^[A-Za-z0-9+/]{43}=$'
+    RealityInfo:
+      type: object
+      required: [fingerprint, public_key, server_name, short_id]
+      properties:
+        fingerprint:
+          type: string
+          enum: [chrome, firefox, safari, ios, android, edge, '360', qq, random, randomized]
+          x-enum-varnames: [RealityFingerprintChrome, RealityFingerprintFirefox, RealityFingerprintSafari, RealityFingerprintIOS, RealityFingerprintAndroid, RealityFingerprintEdge, RealityFingerprint360, RealityFingerprintQQ, RealityFingerprintRandom, RealityFingerprintRandomized]
+        public_key:
+          type: string
+          pattern: '^[A-Za-z0-9+/_-]{43}={0,1}$'
+        server_name:
+          type: string
+          minLength: 1
+          maxLength: 253
+        short_id:
+          type: string
+          maxLength: 16
+          pattern: '^([0-9a-f]{2}){0,8}$'
+    InboundExtensions:
+      type: object
+      properties:
+        reality:
+          $ref: "#/components/schemas/RealityInfo"
+    InboundInfo:
+      type: object
+      required: [port, protocol, security, transport]
+      properties:
+        extensions:
+          $ref: "#/components/schemas/InboundExtensions"
+        flow:
+          type: string
+          enum: ['', xtls-rprx-vision]
+          x-enum-varnames: [InboundFlowNone, InboundFlowXTLSRPRXVision]
+        port:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 65535
+        protocol:
+          type: string
+          enum: [trojan, vless, vmess]
+          x-enum-varnames: [InboundProtocolTrojan, InboundProtocolVless, InboundProtocolVmess]
+        security:
+          type: string
+          enum: [none, reality, tls]
+          x-enum-varnames: [InboundSecurityNone, InboundSecurityReality, InboundSecurityTLS]
+        tls_pin:
+          type: string
+          pattern: '^([0-9a-f]{64})?$'
+        transport:
+          type: string
+          enum: [grpc, tcp, ws]
+          x-enum-varnames: [InboundTransportGRPC, InboundTransportTCP, InboundTransportWS]
+    V2RayPeerRequest:
+      type: object
+      required: [uuid]
+      properties:
+        uuid:
+          type: string
+          minLength: 32
+          maxLength: 45
+    V2RayPeerResponse:
+      type: object
+      required: [inbounds, uuid]
+      properties:
+        inbounds:
+          type: array
+          minItems: 1
+          maxItems: 16
+          items:
+            $ref: "#/components/schemas/InboundInfo"
+        uuid:
+          type: string
+          minLength: 32
+          maxLength: 45
+    V2RayMetadata:
+      type: object
+      required: [inbounds]
+      properties:
+        inbounds:
+          type: array
+          minItems: 1
+          maxItems: 16
+          items:
+            $ref: "#/components/schemas/InboundInfo"
+    OpenVPNPeerRequest:
+      type: object
+      required: [uuid]
+      properties:
+        uuid:
+          type: string
+          minLength: 32
+          maxLength: 45
+    OpenVPNPeerResponse:
+      type: object
+      required: [ca, password, port, protocol, tls_crypt, username]
+      properties:
+        ca:
+          type: string
+          maxLength: 8192
+        password:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+        port:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 65535
+        protocol:
+          type: string
+          enum: [udp, tcp]
+          x-enum-varnames: [OpenVPNPeerResponseProtocolUDP, OpenVPNPeerResponseProtocolTCP]
+        tls_crypt:
+          type: string
+          maxLength: 2048
+          pattern: '^(#[\x20-\x7e]{0,119}\n){0,8}-----BEGIN OpenVPN Static key V1-----\n([0-9a-f]{32}\n){16}-----END OpenVPN Static key V1-----\n$'
+        username:
+          type: string
+          minLength: 32
+          maxLength: 45
+    OpenVPNMetadata:
+      type: object
+      required: [ca, port, protocol, tls_crypt]
+      properties:
+        ca:
+          type: string
+          maxLength: 8192
+        port:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 65535
+        protocol:
+          type: string
+          enum: [udp, tcp]
+          x-enum-varnames: [OpenVPNMetadataProtocolUDP, OpenVPNMetadataProtocolTCP]
+        tls_crypt:
+          type: string
+          maxLength: 2048
+          pattern: '^(#[\x20-\x7e]{0,119}\n){0,8}-----BEGIN OpenVPN Static key V1-----\n([0-9a-f]{32}\n){16}-----END OpenVPN Static key V1-----\n$'
+    AmneziaWGObfuscation:
+      type: object
+      required: [jc, jmin, jmax, s1, s2, s3, s4, h1, h2, h3, h4]
+      properties:
+        jc:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 10
+        jmin:
+          type: integer
+          format: int64
+          minimum: 64
+          maximum: 1024
+        jmax:
+          type: integer
+          format: int64
+          minimum: 64
+          maximum: 1024
+        s1:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 64
+        s2:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 64
+        s3:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 64
+        s4:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 32
+        h1:
+          type: integer
+          format: int64
+          minimum: 5
+          maximum: 4294967295
+        h2:
+          type: integer
+          format: int64
+          minimum: 5
+          maximum: 4294967295
+        h3:
+          type: integer
+          format: int64
+          minimum: 5
+          maximum: 4294967295
+        h4:
+          type: integer
+          format: int64
+          minimum: 5
+          maximum: 4294967295
+        i1:
+          type: string
+          maxLength: 4096
+          pattern: '^(<(b 0x([0-9a-fA-F]{2})+|t|(r|rc|rd) (1000|[1-9][0-9]{0,2}))>)*$'
+        i2:
+          type: string
+          maxLength: 4096
+          pattern: '^(<(b 0x([0-9a-fA-F]{2})+|t|(r|rc|rd) (1000|[1-9][0-9]{0,2}))>)*$'
+        i3:
+          type: string
+          maxLength: 4096
+          pattern: '^(<(b 0x([0-9a-fA-F]{2})+|t|(r|rc|rd) (1000|[1-9][0-9]{0,2}))>)*$'
+        i4:
+          type: string
+          maxLength: 4096
+          pattern: '^(<(b 0x([0-9a-fA-F]{2})+|t|(r|rc|rd) (1000|[1-9][0-9]{0,2}))>)*$'
+        i5:
+          type: string
+          maxLength: 4096
+          pattern: '^(<(b 0x([0-9a-fA-F]{2})+|t|(r|rc|rd) (1000|[1-9][0-9]{0,2}))>)*$'
+    AmneziaWGExtensions:
+      type: object
+      required: [obfuscation]
+      properties:
+        obfuscation:
+          $ref: "#/components/schemas/AmneziaWGObfuscation"
+    AmneziaWGPeerRequest:
+      type: object
+      required: [public_key]
+      properties:
+        public_key:
+          type: string
+          pattern: '^[A-Za-z0-9+/]{43}=$'
+    AmneziaWGPeerResponse:
+      type: object
+      required: [addresses, extensions, mtu, port, public_key]
+      properties:
+        addresses:
+          type: array
+          minItems: 1
+          maxItems: 8
+          items:
+            type: string
+        extensions:
+          $ref: "#/components/schemas/AmneziaWGExtensions"
+        mtu:
+          type: integer
+          format: int32
+          minimum: 1280
+          maximum: 65535
+        port:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 65535
+        public_key:
+          type: string
+          pattern: '^[A-Za-z0-9+/]{43}=$'
+    AmneziaWGMetadata:
+      type: object
+      required: [extensions, port, public_key]
+      properties:
+        extensions:
+          $ref: "#/components/schemas/AmneziaWGExtensions"
+        port:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 65535
+        public_key:
+          type: string
+          pattern: '^[A-Za-z0-9+/]{43}=$'
+    XrayPeerRequest:
+      type: object
+      required: [uuid]
+      properties:
+        uuid:
+          type: string
+          minLength: 32
+          maxLength: 45
+    XrayPeerResponse:
+      type: object
+      required: [inbounds, uuid]
+      properties:
+        inbounds:
+          type: array
+          minItems: 1
+          maxItems: 16
+          items:
+            $ref: "#/components/schemas/InboundInfo"
+        uuid:
+          type: string
+          minLength: 32
+          maxLength: 45
+    XrayMetadata:
+      type: object
+      required: [inbounds]
+      properties:
+        inbounds:
+          type: array
+          minItems: 1
+          maxItems: 16
+          items:
+            $ref: "#/components/schemas/InboundInfo"
+    Hysteria2PeerRequest:
+      type: object
+      required: [uuid]
+      properties:
+        uuid:
+          type: string
+          minLength: 32
+          maxLength: 45
+    Hysteria2PeerResponse:
+      type: object
+      required: [auth, obfs_password, port, tls_pin]
+      properties:
+        auth:
+          type: string
+          minLength: 32
+          maxLength: 45
+        obfs_password:
+          type: string
+          maxLength: 64
+          pattern: '^[\x21-\x7e]{0,64}$'
+        port:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 65535
+        tls_pin:
+          type: string
+          pattern: '^([0-9A-F]{2}:){31}[0-9A-F]{2}$'
+    Hysteria2Metadata:
+      type: object
+      required: [obfs_password, port, tls_pin]
+      properties:
+        obfs_password:
+          type: string
+          maxLength: 64
+          pattern: '^[\x21-\x7e]{0,64}$'
+        port:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 65535
+        tls_pin:
+          type: string
+          pattern: '^([0-9A-F]{2}:){31}[0-9A-F]{2}$'
+    PeerRequest:
+      type: object
+      additionalProperties: false
+      required: [type, payload]
+      properties:
+        type:
+          $ref: "#/components/schemas/ServiceType"
+        payload:
+          type: object
+          additionalProperties: true
+          maxProperties: 32
+      x-go-type: service.PeerRequest
+      x-go-type-import:
+        path: github.com/sentinel-official/sentinel-go-sdk/v3/service
+    PeerResponse:
+      type: object
+      additionalProperties: false
+      required: [id, type, payload]
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 64
+          pattern: '^[A-Za-z0-9+/=-]+$'
+        type:
+          $ref: "#/components/schemas/ServiceType"
+        payload:
+          type: object
+          additionalProperties: true
+          maxProperties: 32
+      x-go-type: service.PeerResponse
+      x-go-type-import:
+        path: github.com/sentinel-official/sentinel-go-sdk/v3/service
+    ServiceMetadata:
+      type: object
+      additionalProperties: false
+      required: [type, payload]
+      properties:
+        type:
+          $ref: "#/components/schemas/ServiceType"
+        payload:
+          type: object
+          additionalProperties: true
+          maxProperties: 32
+      x-go-type: service.ServiceMetadata
+      x-go-type-import:
+        path: github.com/sentinel-official/sentinel-go-sdk/v3/service
+    Health:
+      type: object
+      additionalProperties: false
+      required: [status, version]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+          x-enum-varnames: [HealthStatusOK]
+        version:
+          type: string
+          maxLength: 64
+          pattern: '^[\x20-\x7e]*$'
+    APIInfo:
+      type: object
+      additionalProperties: false
+      required: [urls, tls_sha256]
+      properties:
+        urls:
+          type: array
+          minItems: 1
+          maxItems: 4
+          items:
+            type: string
+            maxLength: 128
+            pattern: '^https://[A-Za-z0-9.:\[\]-]+$'
+        tls_sha256:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+    Bandwidth:
+      type: object
+      additionalProperties: false
+      required: [download_bytes_per_second, upload_bytes_per_second]
+      properties:
+        download_bytes_per_second:
+          type: integer
+          format: uint64
+          minimum: 0
+        upload_bytes_per_second:
+          type: integer
+          format: uint64
+          minimum: 0
+    Location:
+      type: object
+      additionalProperties: false
+      required: [country]
+      properties:
+        city:
+          type: string
+          maxLength: 64
+          pattern: '^[\x20-\x7e]*$'
+        country:
+          type: string
+          pattern: '^[A-Z]{2}$'
+        latitude:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+    Peers:
+      type: object
+      additionalProperties: false
+      required: [current, max]
+      properties:
+        current:
+          type: integer
+          format: uint32
+        max:
+          type: integer
+          format: uint32
+    Prices:
+      type: object
+      additionalProperties: false
+      required: [channel_price_per_gb, channel_price_per_hour, lease_price_per_hour]
+      properties:
+        channel_price_per_gb:
+          type: integer
+          format: uint64
+          minimum: 0
+          maximum: 9223372036854775807
+        channel_price_per_hour:
+          type: integer
+          format: uint64
+          minimum: 0
+          maximum: 9223372036854775807
+        lease_price_per_hour:
+          type: integer
+          format: uint64
+          minimum: 0
+          maximum: 9223372036854775807
+    Settlement:
+      type: object
+      additionalProperties: false
+      required: [heartbeat_seconds, min_channel_prepay_bytes, min_channel_prepay_seconds, min_lease_prepay_seconds, prices]
+      properties:
+        heartbeat_seconds:
+          type: integer
+          format: uint64
+          minimum: 1
+          maximum: 60
+        min_channel_prepay_bytes:
+          type: integer
+          format: uint64
+          minimum: 1
+        min_channel_prepay_seconds:
+          type: integer
+          format: uint64
+          minimum: 1
+        min_lease_prepay_seconds:
+          type: integer
+          format: uint64
+          minimum: 1
+        prices:
+          $ref: "#/components/schemas/Prices"
+    Metadata:
+      type: object
+      additionalProperties: false
+      required: [version, program_id, node, owner, operator, issued_at, expires_at, api, service, location, bandwidth, peers, handshake_dns, settlement, sdk_version]
+      properties:
+        version:
+          type: integer
+          format: uint8
+          minimum: 1
+          maximum: 1
+        program_id:
+          $ref: "#/components/schemas/PublicKey"
+        node:
+          $ref: "#/components/schemas/PublicKey"
+        owner:
+          $ref: "#/components/schemas/PublicKey"
+        operator:
+          $ref: "#/components/schemas/PublicKey"
+        issued_at:
+          type: integer
+          format: int64
+          minimum: 0
+        expires_at:
+          type: integer
+          format: int64
+          minimum: 0
+        api:
+          $ref: "#/components/schemas/APIInfo"
+        service:
+          $ref: "#/components/schemas/ServiceMetadata"
+        location:
+          $ref: "#/components/schemas/Location"
+        bandwidth:
+          $ref: "#/components/schemas/Bandwidth"
+        peers:
+          $ref: "#/components/schemas/Peers"
+        handshake_dns:
+          type: boolean
+        settlement:
+          $ref: "#/components/schemas/Settlement"
+        sdk_version:
+          type: string
+          maxLength: 64
+          pattern: '^[\x20-\x7e]*$'
+    Credential:
+      type: object
+      additionalProperties: false
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [channel, ticket, ticket_request]
+          x-enum-varnames: [CredentialTypeChannel, CredentialTypeTicket, CredentialTypeTicketRequest]
+        channel:
+          $ref: "#/components/schemas/PublicKey"
+        ticket:
+          type: string
+          maxLength: 512
+          pattern: '^[A-Za-z0-9+/]+={0,2}$'
+        ticket_request:
+          type: string
+          maxLength: 512
+          pattern: '^[A-Za-z0-9+/]+={0,2}$'
+    Voucher:
+      type: object
+      additionalProperties: false
+      required: [cumulative, signature]
+      properties:
+        cumulative:
+          type: integer
+          format: uint64
+          minimum: 0
+        signature:
+          type: string
+          format: byte
+          minLength: 88
+          maxLength: 88
+    OpenSessionRequest:
+      type: object
+      additionalProperties: false
+      required: [credential, peer]
+      properties:
+        credential:
+          $ref: "#/components/schemas/Credential"
+        terms:
+          $ref: "#/components/schemas/Terms"
+        voucher:
+          $ref: "#/components/schemas/Voucher"
+        peer:
+          $ref: "#/components/schemas/PeerRequest"
+    OpenSessionResponse:
+      type: object
+      additionalProperties: false
+      required: [consumption, peer, session_id]
+      properties:
+        session_id:
+          type: string
+          maxLength: 36
+          pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+        peer:
+          $ref: "#/components/schemas/PeerResponse"
+        consumption:
+          $ref: "#/components/schemas/Consumption"
+        ledger:
+          $ref: "#/components/schemas/Ledger"
+          x-go-type-skip-optional-pointer: true
+          x-omitzero: true
+        expires_at:
+          type: integer
+          format: int64
+          minimum: 0
+        ticket:
+          type: string
+          maxLength: 512
+          pattern: '^[A-Za-z0-9+/]+={0,2}$'
+    Session:
+      type: object
+      additionalProperties: false
+      required: [consumption, status]
+      properties:
+        close_reason:
+          $ref: "#/components/schemas/ClosedReason"
+          x-go-type-skip-optional-pointer: true
+          x-omitzero: true
+        consumption:
+          $ref: "#/components/schemas/Consumption"
+        ledger:
+          $ref: "#/components/schemas/Ledger"
+          x-go-type-skip-optional-pointer: true
+          x-omitzero: true
+        status:
+          type: string
+          enum: [active, closing, closed]
+    SendVoucherRequest:
+      type: object
+      additionalProperties: false
+      required: [voucher]
+      properties:
+        voucher:
+          $ref: "#/components/schemas/Voucher"
+    SendVoucherResponse:
+      $ref: "#/components/schemas/Position"

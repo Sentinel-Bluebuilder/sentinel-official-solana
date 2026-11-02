@@ -1,0 +1,18 @@
+[package]
+name = "sentinel-test-support"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+name = "test_support"
+
+[dependencies]
+anchor-lang.workspace = true
+litesvm.workspace = true
+solana-sdk.workspace = true
+spl-token-2022-interface.workspace = true
+
+[lints]
+workspace = true

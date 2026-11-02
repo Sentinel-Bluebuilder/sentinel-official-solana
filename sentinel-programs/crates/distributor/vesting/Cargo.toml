@@ -1,0 +1,28 @@
+[package]
+name = "sentinel-distributor-vesting"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "distributor_vesting"
+
+[features]
+idl-build = ["anchor-lang/idl-build", "dep:anchor-lang"]
+serde = ["dep:serde"]
+
+[dependencies]
+anchor-lang = { workspace = true, optional = true }
+borsh = { workspace = true, features = ["derive"] }
+distributor-core = { package = "sentinel-distributor-core", path = "../core" }
+num-bigint.workspace = true
+num-integer.workspace = true
+num-traits.workspace = true
+serde = { workspace = true, features = ["derive"], optional = true }
+thiserror.workspace = true
+
+[dev-dependencies]
+serde_json = { workspace = true }
+
+[lints]
+workspace = true

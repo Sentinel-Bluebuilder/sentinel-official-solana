@@ -1,0 +1,36 @@
+{
+  "address": "11111111111111111111111111111111",
+  "metadata": {"name": "example", "version": "0.1.0", "spec": "0.1.0"},
+  "instructions": [
+    {
+      "name": "write_record",
+      "discriminator": [1, 0, 0, 0, 0, 0, 0, 0],
+      "accounts": [
+        {
+          "name": "record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {"kind": "const", "value": [114, 101, 99, 111, 114, 100]},
+              {"kind": "arg", "path": "record_id"}
+            ]
+          }
+        }
+      ],
+      "args": [{"name": "record_id", "type": "u64"}]
+    }
+  ],
+  "accounts": [{"name": "Record", "discriminator": [2, 0, 0, 0, 0, 0, 0, 0]}],
+  "events": [{"name": "RecordWritten", "discriminator": [3, 0, 0, 0, 0, 0, 0, 0]}],
+  "types": [
+    {
+      "name": "Record",
+      "type": {"kind": "struct", "fields": [{"name": "value", "type": "u64"}]}
+    },
+    {
+      "name": "RecordWritten",
+      "type": {"kind": "struct", "fields": [{"name": "record", "type": "pubkey"}]}
+    }
+  ],
+  "constants": [{"name": "MAX_RECORDS", "type": "u8", "value": "8"}]
+}

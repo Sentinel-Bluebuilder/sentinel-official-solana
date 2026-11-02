@@ -1,0 +1,10 @@
+[Interface]
+Address = {{ join .Addresses ", " }}
+PrivateKey = {{ .PrivateKey }}
+MTU = {{ .MTU }}
+
+[Peer]
+PublicKey = {{ .PublicKey }}
+Endpoint = {{ .Endpoint }}
+AllowedIPs = {{ .AllowedIPs }}
+PersistentKeepalive = {{ .KeepaliveSeconds }}

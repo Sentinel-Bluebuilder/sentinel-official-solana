@@ -1,0 +1,17 @@
+package: providerapi
+generate:
+  gin-server: true
+  strict-server: true
+  client: true
+  models: true
+  embedded-spec: true
+output: api.go
+output-options:
+  skip-prune: true
+  resolve-type-name-collisions: true
+  name-normalizer: ToCamelCaseWithInitialisms
+  additional-initialisms:
+    - SHA256
+    - SDK
+    - GB
+    - URLs

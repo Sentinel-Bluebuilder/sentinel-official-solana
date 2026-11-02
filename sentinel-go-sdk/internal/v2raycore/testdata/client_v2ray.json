@@ -1,0 +1,26 @@
+// Managed by sentinel-dvpnd
+{
+  "api": {"services": ["StatsService"], "tag": "api"},
+  "stats": {},
+  "policy": {"system": {"statsOutboundUplink": true, "statsOutboundDownlink": true}},
+  "inbounds": [
+    {"listen": "127.0.0.1", "port": 2323, "protocol": "dokodemo-door", "settings": {"address": "127.0.0.1"}, "tag": "api"},
+    {"listen": "127.0.0.1", "port": 1080, "protocol": "socks", "settings": {"udp": true}, "sniffing": {"enabled": true, "destOverride": ["http", "tls"]}, "tag": "proxy"}
+  ],
+  "outbounds": [
+    {
+      "protocol": "vless",
+      "tag": "out",
+      "settings": {"vnext": [{"address": "203.0.113.1", "port": 443, "users": [{"id": "00000000-0000-4000-8000-000000000001", "encryption": "none"}]}]},
+      "streamSettings": {
+        "network": "ws",
+        "security": "tls",
+        "tlsSettings": {"allowInsecure": true, "pinnedPeerCertificateChainSha256": ["ASNFZ4mrze8BI0VniavN7wEjRWeJq83vASNFZ4mrze8="]}
+      }
+    }
+  ],
+  "routing": {
+    "domainStrategy": "IPIfNonMatch",
+    "rules": [{"type": "field", "inboundTag": ["api"], "outboundTag": "api"}, {"type": "field", "inboundTag": ["proxy"], "outboundTag": "out"}]
+  }
+}

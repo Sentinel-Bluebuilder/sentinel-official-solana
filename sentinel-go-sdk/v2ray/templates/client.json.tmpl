@@ -1,0 +1,25 @@
+{
+  "api": {"services": ["StatsService"], "tag": "api"},
+  "stats": {},
+  "policy": {"system": {"statsOutboundUplink": true, "statsOutboundDownlink": true}},
+  "inbounds": [
+    {"listen": "127.0.0.1", "port": {{ .APIPort }}, "protocol": "dokodemo-door", "settings": {"address": "127.0.0.1"}, "tag": "api"},
+    {"listen": "127.0.0.1", "port": {{ .ProxyPort }}, "protocol": "socks", "settings": {"udp": true}, "sniffing": {"enabled": true, "destOverride": ["http", "tls"]}, "tag": "proxy"}
+  ],
+  "outbounds": [
+    {
+      "protocol": "{{ .Outbound.Protocol }}",
+      "tag": "out",
+      "settings": {{ if or (eq .Outbound.Protocol "vless") (eq .Outbound.Protocol "vmess") }}{"vnext": [{"address": "{{ .Host }}", "port": {{ .Outbound.Port }}, "users": [{"id": "{{ .UUID }}"{{ if eq .Outbound.Protocol "vless" }}, "encryption": "none"{{ if .Outbound.Flow }}, "flow": "{{ .Outbound.Flow }}"{{ end }}{{ end }}}]}]}{{ else }}{"servers": [{"address": "{{ .Host }}", "port": {{ .Outbound.Port }}, "password": "{{ .UUID }}"}]}{{ end }},
+      "streamSettings": {
+        "network": "{{ .Outbound.Transport }}",
+        "security": "{{ .Outbound.Security }}"{{ if eq .Outbound.Security "tls" }},
+        "tlsSettings": {"allowInsecure": true, "pinnedPeerCertificateChainSha256": ["{{ b64hex .Outbound.TLSPin }}"]}{{ end }}
+      }
+    }
+  ],
+  "routing": {
+    "domainStrategy": "IPIfNonMatch",
+    "rules": [{"type": "field", "inboundTag": ["api"], "outboundTag": "api"}, {"type": "field", "inboundTag": ["proxy"], "outboundTag": "out"}]
+  }
+}

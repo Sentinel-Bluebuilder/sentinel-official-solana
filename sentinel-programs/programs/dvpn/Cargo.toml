@@ -1,0 +1,41 @@
+[package]
+name = "sentinel-dvpn"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "dvpn"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build", "dvpn-core/idl-build"]
+anchor-debug = []
+custom-heap = []
+custom-panic = []
+
+[dependencies]
+anchor-lang = { workspace = true, features = ["init-if-needed"] }
+anchor-spl.workspace = true
+dvpn-core = { package = "sentinel-dvpn-core", path = "../../crates/dvpn/core" }
+spl-token-2022-interface.workspace = true
+solana-curve25519.workspace = true
+solana-sha512-hasher.workspace = true
+curve25519-dalek.workspace = true
+
+[target.'cfg(not(target_os = "solana"))'.dependencies]
+solana-sha512-hasher = { workspace = true, features = ["sha2"] }
+
+[dev-dependencies]
+dvpn-test-support = { package = "sentinel-dvpn-test-support", path = "../../crates/dvpn/test-support" }
+litesvm.workspace = true
+solana-sdk.workspace = true
+solana-program-option.workspace = true
+solana-program-pack.workspace = true
+
+[lints]
+workspace = true

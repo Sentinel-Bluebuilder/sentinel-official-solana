@@ -1,0 +1,46 @@
+version: 2
+project_name: sentinel-dvpnd
+builds:
+  - id: sentinel-dvpnd
+    binary: sentinel-dvpnd
+    main: ./cmd/sentinel-dvpnd
+    env: [CGO_ENABLED=0]
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    mod_timestamp: '{{ .CommitTimestamp }}'
+    ldflags:
+      - -s -w
+      - -X github.com/sentinel-official/sentinel-go-sdk/v3/version.Commit={{ .FullCommit }}
+      - -X github.com/sentinel-official/sentinel-go-sdk/v3/version.Tag={{ .Version }}
+      - -X github.com/sentinel-official/sentinel-go-sdk/v3/version.Network={{ .Env.SENTINEL_NETWORK }}
+      - -X github.com/sentinel-official/sentinel-go-sdk/v3/version.ProgramID={{ .Env.SENTINEL_PROGRAM_ID }}
+      - -X github.com/sentinel-official/sentinel-go-sdk/v3/version.Mint={{ .Env.SENTINEL_MINT }}
+    hooks:
+      post:
+        - cmd: '{{ if eq .Os "windows" }}cp{{ else }}ln -sf{{ end }} {{ .Name }} dvpnd{{ .Ext }}'
+          dir: '{{ dir .Path }}'
+archives:
+  - formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - src: '{{ dir .ArtifactPath }}/dvpnd{{ .ArtifactExt }}'
+        strip_parent: true
+checksum:
+  name_template: checksums.txt
+sboms:
+  - artifacts: archive
+dockers_v2:
+  - images: [ghcr.io/sentinel-official/sentinel-dvpnd]
+    dockerfile: Dockerfile
+    platforms: [linux/amd64, linux/arm64]
+    build_args:
+      SENTINEL_NETWORK: "{{ .Env.SENTINEL_NETWORK }}"
+      SENTINEL_PROGRAM_ID: "{{ .Env.SENTINEL_PROGRAM_ID }}"
+      SENTINEL_MINT: "{{ .Env.SENTINEL_MINT }}"
+    tags:
+      - "{{ .Version }}{{ if ne .Env.SENTINEL_NETWORK \"mainnet\" }}-{{ .Env.SENTINEL_NETWORK }}{{ end }}"
+release:
+  mode: keep-existing

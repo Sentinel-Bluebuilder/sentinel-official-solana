@@ -1,0 +1,75 @@
+version: "2"
+linters:
+  default: all
+  disable:
+    - cyclop
+    - decorder
+    - depguard
+    - err113
+    - exhaustruct
+    - exhaustruct_v5
+    - forcetypeassert
+    - funlen
+    - gocognit
+    - gomodguard
+    - ireturn
+    - mnd
+    - nestif
+    - nilnil
+    - noinlineerr
+    - nonamedreturns
+    - varnamelen
+    - wsl
+  settings:
+    funcorder:
+      constructor: false
+    goconst:
+      min-occurrences: 12
+    gomoddirectives:
+      replace-local: true
+    grouper:
+      import-require-grouping: true
+    gosec:
+      excludes:
+        - G115
+        - G204
+        - G404
+    lll:
+      line-length: 120
+      tab-width: 1
+    recvcheck:
+      exclusions:
+        - "*.UnmarshalText"
+    revive:
+      rules:
+        - name: package-comments
+          disabled: true
+        - name: exported
+          disabled: true
+    tagliatelle:
+      case:
+        rules:
+          json: snake
+          toml: snake
+    testpackage:
+      skip-regexp: "(export(_(linux|darwin|windows))?|internal)_test\\.go"
+    wrapcheck:
+      ignore-package-globs:
+        - github.com/sentinel-official/sentinel-go-sdk/v3/*
+        - github.com/sentinel-official/sentinel-programs/clients/go/*
+  exclusions:
+    generated: strict
+formatters:
+  enable:
+    - gci
+    - gofmt
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(github.com/sentinel-official)
+run:
+  build-tags:
+    - integration
+  timeout: 5m

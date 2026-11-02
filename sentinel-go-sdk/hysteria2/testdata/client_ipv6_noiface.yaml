@@ -1,0 +1,19 @@
+# Managed by sentinel-dvpnd
+server: "[2001:db8::1]:443"
+auth: "00000000-0000-4000-8000-000000000001"
+tls:
+  insecure: true
+  pinSHA256: "AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB"
+tun:
+  mtu: 1420
+  address:
+    ipv4: 100.100.100.101/30
+    ipv6: 2001::ffff:ffff:ffff:fff1/126
+  route:
+    ipv4:
+      - 0.0.0.0/0
+    ipv6:
+      - ::/0
+    ipv6Exclude:
+      - "2001:db8::1/128"
+

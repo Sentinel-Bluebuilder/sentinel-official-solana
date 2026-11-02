@@ -1,0 +1,74 @@
+version: "2"
+linters:
+  default: all
+  disable:
+    - cyclop
+    - depguard
+    - err113
+    - exhaustruct
+    - exhaustruct_v5
+    - forcetypeassert
+    - funlen
+    - gocognit
+    - gomodguard
+    - ireturn
+    - mnd
+    - nestif
+    - nilnil
+    - noinlineerr
+    - nonamedreturns
+    - varnamelen
+    - wsl
+  settings:
+    lll:
+      line-length: 120
+      tab-width: 1
+    decorder:
+      dec-order:
+        - const
+        - var
+        - type
+        - func
+      disable-dec-order-check: true
+      disable-init-func-first-check: false
+      disable-dec-num-check: true
+    goconst:
+      min-occurrences: 12
+    gomoddirectives:
+      replace-allow-list:
+        - github.com/syndtr/goleveldb
+    gosec:
+      excludes:
+        - G115
+        - G204
+        - G404
+    revive:
+      rules:
+        - name: package-comments
+          disabled: true
+        - name: exported
+          disabled: true
+    tagliatelle:
+      case:
+        rules:
+          json: snake
+          toml: snake
+    wrapcheck:
+      ignore-package-globs:
+        - github.com/sentinel-official/sentinel-snapshot/*
+  exclusions:
+    generated: strict
+formatters:
+  enable:
+    - gci
+    - gofmt
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(github.com/sentinel-official)
+run:
+  build-tags:
+    - integration
+  timeout: 10m

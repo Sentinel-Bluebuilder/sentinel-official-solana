@@ -1,0 +1,60 @@
+[package]
+name = "sentinel-ceremony"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "ceremony"
+path = "src/lib.rs"
+
+[[bin]]
+name = "ceremony"
+path = "src/main.rs"
+
+[dependencies]
+base64 = { workspace = true }
+clap = { workspace = true, features = ["derive", "env"] }
+anchor-lang = { workspace = true }
+anyhow = { workspace = true }
+bincode = { workspace = true }
+distributor = { package = "sentinel-distributor", path = "../../programs/distributor", features = ["no-entrypoint"] }
+distributor-core = { package = "sentinel-distributor-core", path = "../../crates/distributor/core" }
+distributor-dataset = { package = "sentinel-distributor-dataset", path = "../../crates/distributor/dataset" }
+distributor-merkle = { package = "sentinel-distributor-merkle", path = "../../crates/distributor/merkle" }
+distributor-mint = { package = "sentinel-distributor-mint", path = "../../crates/distributor/mint" }
+dvpn = { package = "sentinel-dvpn", path = "../../programs/dvpn", features = ["no-entrypoint"] }
+dvpn-core = { package = "sentinel-dvpn-core", path = "../../crates/dvpn/core" }
+hex = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+solana-client = { workspace = true }
+solana-commitment-config = { workspace = true }
+solana-feature-gate-interface = { workspace = true, features = ["serde"] }
+solana-hash = { workspace = true }
+solana-instruction = { workspace = true }
+solana-keypair = { workspace = true }
+solana-loader-v3-interface = { workspace = true }
+solana-message = { workspace = true }
+solana-pubkey = { workspace = true }
+solana-signature = { workspace = true }
+solana-signer = { workspace = true }
+solana-transaction = { workspace = true }
+spl-associated-token-account = { workspace = true }
+spl-token-2022-interface = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+txv1 = { package = "sentinel-txv1", path = "../../crates/txv1", features = ["rpc"] }
+zeroize = { workspace = true }
+tracing-subscriber = { workspace = true }
+ureq = { workspace = true }
+
+[dev-dependencies]
+distributor-test-support = { package = "sentinel-distributor-test-support", path = "../../crates/distributor/test-support" }
+litesvm = { workspace = true }
+solana-sdk = { workspace = true }
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

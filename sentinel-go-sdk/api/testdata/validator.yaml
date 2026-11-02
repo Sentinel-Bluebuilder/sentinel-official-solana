@@ -1,0 +1,25 @@
+openapi: 3.0.3
+info: {title: things, version: "1"}
+paths:
+  /v1/things:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: {type: string, maxLength: 3}
+      responses:
+        "200": {description: ok}
+  /v1/things/{id}:
+    get:
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string, pattern: "^[a-z]+$"}
+      responses:
+        "200": {description: ok}

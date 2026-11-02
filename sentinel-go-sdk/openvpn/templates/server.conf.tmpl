@@ -1,0 +1,20 @@
+dev {{ .Interface }}
+dev-type tun
+port {{ .Port }}
+proto {{ .Protocol }}
+server {{ .Network }} {{ .Netmask }}
+topology subnet
+keepalive 10 60
+persist-key
+persist-tun
+cert {{ .CertFile }}
+key {{ .KeyFile }}
+ca {{ .CertFile }}
+dh none
+tls-crypt {{ .TLSCryptFile }}
+verify-client-cert none
+username-as-common-name
+management 127.0.0.1 {{ .ManagementPort }}
+management-client-auth
+tmp-dir {{ .TmpDir }}
+verb 3

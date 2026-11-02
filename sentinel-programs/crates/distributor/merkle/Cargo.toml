@@ -1,0 +1,18 @@
+[package]
+name = "sentinel-distributor-merkle"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "distributor_merkle"
+
+[dependencies]
+distributor-core = { package = "sentinel-distributor-core", path = "../core" }
+thiserror.workspace = true
+
+[dev-dependencies]
+k256 = { workspace = true, features = ["arithmetic", "ecdsa"] }
+
+[lints]
+workspace = true

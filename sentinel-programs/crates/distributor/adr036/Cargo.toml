@@ -1,0 +1,23 @@
+[package]
+name = "sentinel-distributor-adr036"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+name = "distributor_adr036"
+
+[dependencies]
+base64.workspace = true
+bs58.workspace = true
+distributor-core = { version = "0.1.0", package = "sentinel-distributor-core", path = "../core" }
+sha2.workspace = true
+solana-pubkey.workspace = true
+solana-secp256k1-recover.workspace = true
+
+[target.'cfg(not(target_os = "solana"))'.dependencies]
+k256 = { workspace = true, features = ["arithmetic", "ecdsa"] }
+
+[lints]
+workspace = true

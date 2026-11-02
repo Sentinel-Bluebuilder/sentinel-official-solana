@@ -1,0 +1,45 @@
+[package]
+name = "sentinel-xtask"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+build = "build.rs"
+
+[lib]
+name = "xtask"
+path = "src/lib.rs"
+
+[[bin]]
+name = "xtask"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+ceremony = { package = "sentinel-ceremony", path = "../cli/ceremony" }
+distributor-mint = { package = "sentinel-distributor-mint", path = "../crates/distributor/mint" }
+distributor-test-support = { package = "sentinel-distributor-test-support", path = "../crates/distributor/test-support" }
+dvpn-core = { package = "sentinel-dvpn-core", path = "../crates/dvpn/core" }
+dvpn-test-support = { package = "sentinel-dvpn-test-support", path = "../crates/dvpn/test-support" }
+litesvm = { workspace = true }
+solana-sdk = { workspace = true }
+tempfile = { workspace = true }
+test-support = { package = "sentinel-test-support", path = "../crates/test-support" }
+txv1 = { package = "sentinel-txv1", path = "../crates/txv1" }
+clap = { workspace = true, features = ["derive"] }
+distributor-core = { package = "sentinel-distributor-core", path = "../crates/distributor/core" }
+distributor-dataset = { package = "sentinel-distributor-dataset", path = "../crates/distributor/dataset" }
+distributor-merkle = { package = "sentinel-distributor-merkle", path = "../crates/distributor/merkle" }
+distributor-vesting = { package = "sentinel-distributor-vesting", path = "../crates/distributor/vesting", features = [
+  "serde",
+] }
+hex = { workspace = true }
+k256 = { workspace = true, features = ["arithmetic", "ecdsa"] }
+rayon = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+
+[dev-dependencies]
+distributor = { package = "sentinel-distributor", path = "../programs/distributor", features = ["no-entrypoint"] }
+
+[lints]
+workspace = true

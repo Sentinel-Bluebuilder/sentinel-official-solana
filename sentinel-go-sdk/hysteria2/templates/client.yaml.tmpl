@@ -1,0 +1,25 @@
+server: "{{ .Endpoint }}"
+auth: "{{ .Auth }}"
+tls:
+  insecure: true
+  pinSHA256: "{{ .TLSPin }}"
+{{ if .ObfsPassword }}obfs:
+  type: salamander
+  salamander:
+    password: "{{ .ObfsPassword }}"
+{{ end }}tun:
+{{ if .Interface }}  name: "{{ .Interface }}"
+{{ end }}  mtu: 1420
+  address:
+    ipv4: 100.100.100.101/30
+    ipv6: 2001::ffff:ffff:ffff:fff1/126
+  route:
+    ipv4:
+      - 0.0.0.0/0
+    ipv6:
+      - ::/0
+{{ if .ExcludeV4 }}    ipv4Exclude:
+      - "{{ .ExcludeV4 }}"
+{{ end }}{{ if .ExcludeV6 }}    ipv6Exclude:
+      - "{{ .ExcludeV6 }}"
+{{ end }}

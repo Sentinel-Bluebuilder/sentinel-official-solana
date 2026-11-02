@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package v2ray.core.app.stats.command;
+
+option go_package = "github.com/sentinel-official/sentinel-go-sdk/v3/v2ray/v2raypb;v2raypb";
+
+message QueryStatsRequest {
+  string pattern = 1;
+  bool reset = 2;
+}
+
+message Stat {
+  string name = 1;
+  int64 value = 2;
+}
+
+message QueryStatsResponse {
+  repeated Stat stat = 1;
+}
+
+service StatsService {
+  rpc QueryStats(QueryStatsRequest) returns (QueryStatsResponse) {}
+}

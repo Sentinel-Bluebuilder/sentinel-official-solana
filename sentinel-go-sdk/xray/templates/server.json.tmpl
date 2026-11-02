@@ -1,0 +1,22 @@
+{
+  "api": {"services": ["HandlerService", "StatsService"], "tag": "api"},
+  "stats": {},
+  "policy": {"levels": {"0": {"statsUserUplink": true, "statsUserDownlink": true, "connIdle": 120}}},
+  "inbounds": [
+    {"listen": "127.0.0.1", "port": {{ .APIPort }}, "protocol": "dokodemo-door", "settings": {"address": "127.0.0.1"}, "tag": "api"}{{ range .Inbounds }},
+    {
+      "port": {{ .Port }},
+      "protocol": "{{ .Protocol }}",
+      "tag": "{{ .Tag }}",
+      "settings": {{ if eq .Protocol "vless" }}{"clients": [], "decryption": "none"}{{ else }}{"clients": []}{{ end }},
+      "streamSettings": {
+        "network": "{{ .Transport }}",
+        "security": "{{ .Security }}"{{ if eq .Security "tls" }},
+        "tlsSettings": {"certificates": [{"certificateFile": "{{ $.CertFile }}", "keyFile": "{{ $.KeyFile }}"}]}{{ end }}{{ if eq .Security "reality" }},
+        "realitySettings": {"dest": "{{ .Extensions.Reality.Dest }}", "privateKey": "{{ .Extensions.Reality.PrivateKey }}", "serverNames": ["{{ .Extensions.Reality.ServerName }}"], "shortIds": ["{{ .Extensions.Reality.ShortID }}"]}{{ end }}
+      }
+    }{{ end }}
+  ],
+  "outbounds": [{"protocol": "freedom"}],
+  "routing": {"rules": [{"type": "field", "inboundTag": ["api"], "outboundTag": "api"}]}
+}

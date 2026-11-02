@@ -1,0 +1,29 @@
+client
+dev {{ .Dev }}
+dev-type tun
+{{ if .DevNode }}dev-node "{{ .DevNode }}"
+{{ end }}remote {{ .Host }} {{ .Port }} {{ .Protocol }}
+nobind
+persist-key
+persist-tun
+remote-cert-tls server
+ca {{ .CAFile }}
+tls-crypt {{ .TLSCryptFile }}
+auth-user-pass {{ .AuthFile }}
+auth-nocache
+management 127.0.0.1 {{ .ManagementPort }}
+tmp-dir {{ .TmpDir }}
+redirect-gateway def1 ipv6 bypass-dhcp
+pull-filter accept "ifconfig "
+pull-filter accept "ifconfig-ipv6 "
+pull-filter accept "topology "
+pull-filter accept "route-gateway "
+pull-filter accept "tun-mtu "
+pull-filter accept "ping"
+pull-filter accept "cipher "
+pull-filter accept "peer-id "
+pull-filter accept "auth-token"
+pull-filter accept "protocol-flags "
+pull-filter accept "key-derivation "
+pull-filter ignore ""
+verb 3

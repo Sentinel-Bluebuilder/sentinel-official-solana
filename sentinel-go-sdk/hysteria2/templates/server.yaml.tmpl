@@ -1,0 +1,26 @@
+listen: ":{{ .Port }}"
+tls:
+  cert: {{ .CertFile }}
+  key: {{ .KeyFile }}
+auth:
+  type: http
+  http:
+    url: http://127.0.0.1:{{ .AuthPort }}/
+trafficStats:
+  listen: 127.0.0.1:{{ .StatsPort }}
+  secret: {{ .StatsSecret }}
+{{ if .ObfsPassword }}obfs:
+  type: salamander
+  salamander:
+    password: "{{ .ObfsPassword }}"
+{{ end }}{{ if .MasqueradeURL }}masquerade:
+  type: proxy
+  proxy:
+    url: {{ .MasqueradeURL }}
+    rewriteHost: true
+{{ else }}masquerade:
+  type: string
+  string:
+    content: not found
+    statusCode: 404
+{{ end }}

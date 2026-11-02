@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package xray.app.proxyman.command;
+
+option go_package = "github.com/sentinel-official/sentinel-go-sdk/v3/xray/xraypb;xraypb";
+
+message TypedMessage {
+  string type = 1;
+  bytes value = 2;
+}
+
+message User {
+  uint32 level = 1;
+  string email = 2;
+  TypedMessage account = 3;
+}
+
+message AddUserOperation {
+  User user = 1;
+}
+
+message RemoveUserOperation {
+  string email = 1;
+}
+
+message AlterInboundRequest {
+  string tag = 1;
+  TypedMessage operation = 2;
+}
+
+message AlterInboundResponse {}
+
+service HandlerService {
+  rpc AlterInbound(AlterInboundRequest) returns (AlterInboundResponse) {}
+}
+
+message VlessAccount {
+  string id = 1;
+  string flow = 2;
+  string encryption = 3;
+}
+
+message VmessAccount {
+  string id = 1;
+}
+
+message TrojanAccount {
+  string password = 1;
+}

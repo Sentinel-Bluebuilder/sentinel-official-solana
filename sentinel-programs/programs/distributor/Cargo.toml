@@ -1,0 +1,37 @@
+[package]
+name = "sentinel-distributor"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "distributor"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build", "distributor-vesting/idl-build"]
+anchor-debug = []
+custom-heap = []
+custom-panic = []
+
+[dependencies]
+anchor-lang = { workspace = true, features = ["init-if-needed"] }
+anchor-spl.workspace = true
+bytemuck = { workspace = true, features = ["derive", "min_const_generics"] }
+distributor-adr036 = { package = "sentinel-distributor-adr036", path = "../../crates/distributor/adr036" }
+distributor-merkle = { package = "sentinel-distributor-merkle", path = "../../crates/distributor/merkle", default-features = false }
+distributor-core = { package = "sentinel-distributor-core", path = "../../crates/distributor/core" }
+distributor-vesting = { package = "sentinel-distributor-vesting", path = "../../crates/distributor/vesting" }
+
+[dev-dependencies]
+distributor-test-support = { package = "sentinel-distributor-test-support", path = "../../crates/distributor/test-support" }
+litesvm.workspace = true
+solana-sdk.workspace = true
+spl-token-2022-interface.workspace = true
+
+[lints]
+workspace = true

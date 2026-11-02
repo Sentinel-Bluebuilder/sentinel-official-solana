@@ -1,0 +1,24 @@
+version: v2
+modules:
+  - path: daemon/v1
+    lint:
+      use:
+        - STANDARD
+      except:
+        - PACKAGE_DIRECTORY_MATCH
+  - path: v2ray/v2raypb
+    lint:
+      use:
+        - STANDARD
+      except:
+        - PACKAGE_DIRECTORY_MATCH
+        - PACKAGE_VERSION_SUFFIX
+        - DIRECTORY_SAME_PACKAGE
+  - path: xray/xraypb
+    lint:
+      use:
+        - STANDARD
+      except:
+        - PACKAGE_DIRECTORY_MATCH
+        - PACKAGE_VERSION_SUFFIX
+        - DIRECTORY_SAME_PACKAGE

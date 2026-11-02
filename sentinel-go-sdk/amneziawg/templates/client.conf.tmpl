@@ -1,0 +1,26 @@
+[Interface]
+Address = {{ join .Addresses ", " }}
+PrivateKey = {{ .PrivateKey }}
+MTU = {{ .MTU }}
+Jc = {{ .Extensions.Obfuscation.Jc }}
+Jmin = {{ .Extensions.Obfuscation.Jmin }}
+Jmax = {{ .Extensions.Obfuscation.Jmax }}
+S1 = {{ .Extensions.Obfuscation.S1 }}
+S2 = {{ .Extensions.Obfuscation.S2 }}
+S3 = {{ .Extensions.Obfuscation.S3 }}
+S4 = {{ .Extensions.Obfuscation.S4 }}
+H1 = {{ .Extensions.Obfuscation.H1 }}
+H2 = {{ .Extensions.Obfuscation.H2 }}
+H3 = {{ .Extensions.Obfuscation.H3 }}
+H4 = {{ .Extensions.Obfuscation.H4 }}
+{{ if .Extensions.Obfuscation.I1 }}I1 = {{ .Extensions.Obfuscation.I1 }}
+{{ end }}{{ if .Extensions.Obfuscation.I2 }}I2 = {{ .Extensions.Obfuscation.I2 }}
+{{ end }}{{ if .Extensions.Obfuscation.I3 }}I3 = {{ .Extensions.Obfuscation.I3 }}
+{{ end }}{{ if .Extensions.Obfuscation.I4 }}I4 = {{ .Extensions.Obfuscation.I4 }}
+{{ end }}{{ if .Extensions.Obfuscation.I5 }}I5 = {{ .Extensions.Obfuscation.I5 }}
+{{ end }}
+[Peer]
+PublicKey = {{ .PublicKey }}
+Endpoint = {{ .Endpoint }}
+AllowedIPs = {{ .AllowedIPs }}
+PersistentKeepalive = {{ .KeepaliveSeconds }}

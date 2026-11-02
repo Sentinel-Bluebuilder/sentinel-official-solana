@@ -1,0 +1,19 @@
+========================
+ Records for UID 0 : 00000000-0000-0000-0000-000000000000
+========================
+
+ Items:
+
+ #1:
+                 Name: sentinel-dvpnd
+                 Type: legacy daemon (0x10008)
+          Disposition: [enabled, allowed, visible, notified] (0xb)
+           Identifier: 16.co.sentinel.sentinel-dvpnd.c0
+                  URL: file:///Library/LaunchDaemons/co.sentinel.sentinel-dvpnd.c0.plist
+
+ #2:
+                 Name: sentinel-dvpnd
+                 Type: legacy daemon (0x10008)
+          Disposition: [disabled, allowed, visible, notified] (0xa)
+           Identifier: 16.co.sentinel.sentinel-dvpnd.c1
+                  URL: file:///Library/LaunchDaemons/co.sentinel.sentinel-dvpnd.c1.plist

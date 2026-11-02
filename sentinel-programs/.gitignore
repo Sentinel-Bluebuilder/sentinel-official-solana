@@ -1,0 +1,35 @@
+# Build output
+.anchor
+target
+**/*.rs.bk
+/tools/anchor-go/anchor-go
+
+# Local data
+test-ledger
+.surfpool
+
+# Keys
+keys
+*-keypair.json
+id.json
+
+# Test and coverage output
+*.test
+coverage.out
+*.profraw
+*.profdata
+lcov.info
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Editors and OS
+.idea
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db

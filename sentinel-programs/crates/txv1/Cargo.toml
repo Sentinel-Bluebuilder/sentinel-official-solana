@@ -1,0 +1,46 @@
+[package]
+name = "sentinel-txv1"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "txv1"
+
+[features]
+rpc = [
+  "dep:solana-account",
+  "dep:solana-client",
+  "dep:solana-commitment-config",
+  "dep:solana-feature-gate-interface",
+  "dep:solana-system-interface",
+  "dep:tracing",
+]
+
+[dependencies]
+solana-account = { workspace = true, optional = true }
+solana-client = { workspace = true, optional = true }
+solana-commitment-config = { workspace = true, optional = true }
+solana-feature-gate-interface = { workspace = true, features = ["bincode"], optional = true }
+solana-hash.workspace = true
+solana-instruction.workspace = true
+solana-keypair.workspace = true
+solana-message.workspace = true
+solana-pubkey.workspace = true
+solana-signature = { workspace = true }
+solana-signer.workspace = true
+solana-system-interface = { workspace = true, optional = true }
+solana-transaction = { workspace = true, features = ["wincode"] }
+thiserror.workspace = true
+tracing = { workspace = true, optional = true }
+wincode.workspace = true
+
+[dev-dependencies]
+agave-feature-set = { workspace = true }
+base64 = { workspace = true }
+serde_json = { workspace = true }
+litesvm.workspace = true
+solana-system-interface = { workspace = true, features = ["wincode"] }
+
+[lints]
+workspace = true

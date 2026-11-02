@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package v2ray.core.app.proxyman.command;
+
+import "google/protobuf/any.proto";
+
+option go_package = "github.com/sentinel-official/sentinel-go-sdk/v3/v2ray/v2raypb;v2raypb";
+
+message User {
+  uint32 level = 1;
+  string email = 2;
+  google.protobuf.Any account = 3;
+}
+
+message AddUserOperation {
+  User user = 1;
+}
+
+message RemoveUserOperation {
+  string email = 1;
+}
+
+message AlterInboundRequest {
+  string tag = 1;
+  google.protobuf.Any operation = 2;
+}
+
+message AlterInboundResponse {}
+
+service HandlerService {
+  rpc AlterInbound(AlterInboundRequest) returns (AlterInboundResponse) {}
+}
+
+message VlessAccount {
+  string id = 1;
+  string flow = 2;
+  string encryption = 3;
+}
+
+message VmessAccount {
+  string id = 1;
+}
+
+message TrojanAccount {
+  string password = 1;
+}
