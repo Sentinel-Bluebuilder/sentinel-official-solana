@@ -53,6 +53,10 @@ func (c *Client) Cleanup(ctx context.Context) error {
 		return err
 	}
 
+	if err := removeRouteRules(ctx, c.Interface()); err != nil {
+		c.log.Warn().Err(err).Msg("sing-tun policy rules left")
+	}
+
 	return service.RemoveOwned(c.placement.ToolDir, c.placement.Interface)
 }
 
@@ -186,6 +190,12 @@ func (c *Client) Stop(ctx context.Context) error {
 
 		if err := service.RemoveOwned(c.placement.ToolDir, c.placement.Interface); err != nil {
 			return err
+		}
+
+		// sing-tun removes its policy rules only on a clean exit; after a killed hysteria2 they stay
+		// and route everything to a table nobody serves.
+		if err := removeRouteRules(context.WithoutCancel(ctx), c.Interface()); err != nil {
+			c.log.Warn().Err(err).Msg("sing-tun policy rules left")
 		}
 
 		c.log.Info().Str("iface", c.Interface()).Str("process", binary).Msg("service stopped")
