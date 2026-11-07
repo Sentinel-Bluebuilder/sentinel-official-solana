@@ -80,7 +80,7 @@ func TestLookPath_RejectsOtherOwner(t *testing.T) {
 
 	defer func() { trustEUID = real }()
 
-	_, err = LookPath(path)
+	_, err := LookPath(path)
 	require.ErrorIs(t, err, ErrUntrustedBinary)
 }
 
