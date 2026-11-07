@@ -59,14 +59,24 @@ func TestLookPath_RejectsWritableBinary(t *testing.T) {
 }
 
 func TestLookPath_RejectsOtherOwner(t *testing.T) {
-	path := writeTool(t, openDir(t, 0o755), "trust-probe", 0o755)
+	dir := openDir(t, 0o755)
+	path := writeTool(t, dir, "trust-probe", 0o755)
 
-	_, err := LookPath(path)
-	require.NoError(t, err)
-
-	// Stand in for the root daemon: the tool now belongs to an ordinary user, as a planted one does.
 	real := trustEUID
-	trustEUID = func() int { return 0 }
+
+	if os.Geteuid() == 0 {
+		// Running as root: give the tool to an ordinary account, as a planted one would be.
+		const nobody = 65534
+
+		require.NoError(t, os.Chown(dir, nobody, nobody))
+		require.NoError(t, os.Chown(path, nobody, nobody))
+	} else {
+		_, err := LookPath(path)
+		require.NoError(t, err)
+
+		// Stand in for the root daemon: the tool belongs to this ordinary user, as a planted one does.
+		trustEUID = func() int { return 0 }
+	}
 
 	defer func() { trustEUID = real }()
 
