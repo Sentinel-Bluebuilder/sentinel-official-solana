@@ -18,7 +18,10 @@ func TestCapacityFor(t *testing.T) {
 	require.Equal(t, 36, program.CapacityFor(program.BatchRedeemVouchers, 5000))
 	require.Equal(t, 29, program.CapacityFor(program.BatchRedeemStreams, 1232))
 	require.Equal(t, 60, program.CapacityFor(program.BatchRedeemStreams, 4096))
+	require.Equal(t, 8, program.CapacityFor(program.BatchRedeemPartialVouchers, 1232))
+	require.Equal(t, 33, program.CapacityFor(program.BatchRedeemPartialVouchers, 4096))
 	require.Zero(t, program.CapacityFor(program.BatchRedeemVouchers, 100))
+	require.Zero(t, program.CapacityFor(program.BatchRedeemPartialVouchers, 100))
 	require.Equal(t, program.CapacityFund, program.CapacityFor(program.BatchFund, 1232))
 	require.Equal(t, program.CapacitySweep, program.CapacityFor(program.BatchSweep, 100))
 }
@@ -34,6 +37,8 @@ func TestCapacityFor_SerializedRedeemTransactions(t *testing.T) {
 	}{
 		{count: 9, kind: program.BatchRedeemVouchers, name: "vouchers_at_capacity", wantBytes: 1214},
 		{count: 10, kind: program.BatchRedeemVouchers, name: "vouchers_over_capacity", wantBytes: 1319},
+		{count: 8, kind: program.BatchRedeemPartialVouchers, name: "partial_vouchers_at_capacity", wantBytes: 1173},
+		{count: 9, kind: program.BatchRedeemPartialVouchers, name: "partial_vouchers_over_capacity", wantBytes: 1286},
 		{count: 29, kind: program.BatchRedeemStreams, name: "streams_at_capacity", wantBytes: 1222},
 		{count: 30, kind: program.BatchRedeemStreams, name: "streams_over_capacity", wantBytes: 1255},
 		{count: 60, kind: program.BatchRedeemStreams, name: "streams_at_address_limit", wantBytes: 2245},
@@ -59,14 +64,23 @@ func TestCapacityFor_SerializedRedeemTransactions(t *testing.T) {
 			var ix solana.Instruction
 
 			var err error
-			if tc.kind == program.BatchRedeemVouchers {
+
+			switch tc.kind {
+			case program.BatchRedeemPartialVouchers:
+				ix, err = dvpn.BuildRedeemChannelVouchersPartialInstruction(dvpn.ProgramID, dvpn.RedeemChannelVouchersPartialParams{
+					Node:              solana.PublicKey{},
+					RemainingAccounts: accounts,
+					Signer:            payer,
+					Vouchers:          make([]dvpn.PartialVoucher, tc.count),
+				})
+			case program.BatchRedeemVouchers:
 				ix, err = dvpn.BuildRedeemChannelVouchersInstruction(dvpn.ProgramID, dvpn.RedeemChannelVouchersParams{
 					Node:              solana.PublicKey{},
 					RemainingAccounts: accounts,
 					Signer:            payer,
 					Vouchers:          make([]dvpn.Voucher, tc.count),
 				})
-			} else {
+			default:
 				ix, err = dvpn.BuildRedeemChannelStreamsInstruction(dvpn.ProgramID, dvpn.RedeemChannelStreamsParams{
 					Node:              solana.PublicKey{},
 					RemainingAccounts: accounts,

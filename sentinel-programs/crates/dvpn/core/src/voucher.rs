@@ -65,6 +65,27 @@ pub struct Voucher {
     pub signature: [u8; 64],
 }
 
+/// A voucher redeemed for less than it was signed for. The signature over `cumulative_amount`
+/// authorizes the node to take up to that total; `amount` is the total it claims, so the rest
+/// of the escrow stays with the client and is returned at close.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq, Debug)]
+pub struct PartialVoucher {
+    pub cumulative_amount: u64,
+    pub signature: [u8; 64],
+    pub amount: u64,
+}
+
+impl From<Voucher> for PartialVoucher {
+    /// A whole voucher is a partial voucher that claims everything it was signed for.
+    fn from(voucher: Voucher) -> Self {
+        Self {
+            cumulative_amount: voucher.cumulative_amount,
+            signature: voucher.signature,
+            amount: voucher.cumulative_amount,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used, clippy::indexing_slicing, clippy::panic)]

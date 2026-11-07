@@ -4479,6 +4479,80 @@ func UnmarshalParamsSet(buf []byte) (*ParamsSet, error) {
 	return obj, nil
 }
 
+// A voucher redeemed for less than it was signed for. The signature over `cumulative_amount`
+// authorizes the node to take up to that total; `amount` is the total it claims, so the rest
+// of the escrow stays with the client and is returned at close.
+type PartialVoucher struct {
+	CumulativeAmount uint64    `json:"cumulative_amount"`
+	Signature        [64]uint8 `json:"signature"`
+	Amount           uint64    `json:"amount"`
+}
+
+func (p PartialVoucher) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
+	// Serialize `CumulativeAmount`:
+	err = encoder.Encode(p.CumulativeAmount)
+	if err != nil {
+		return newFieldError("CumulativeAmount", err)
+	}
+	// Serialize `Signature`:
+	err = encoder.Encode(p.Signature)
+	if err != nil {
+		return newFieldError("Signature", err)
+	}
+	// Serialize `Amount`:
+	err = encoder.Encode(p.Amount)
+	if err != nil {
+		return newFieldError("Amount", err)
+	}
+	return nil
+}
+
+func (p PartialVoucher) Marshal() ([]byte, error) {
+	buf := bytes.NewBuffer(nil)
+	encoder := binary.NewBorshEncoder(buf)
+	err := p.MarshalWithEncoder(encoder)
+	if err != nil {
+		return nil, fmt.Errorf("error while encoding PartialVoucher: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+func (p *PartialVoucher) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
+	// Deserialize `CumulativeAmount`:
+	err = decoder.Decode(&p.CumulativeAmount)
+	if err != nil {
+		return newFieldError("CumulativeAmount", err)
+	}
+	// Deserialize `Signature`:
+	err = decoder.Decode(&p.Signature)
+	if err != nil {
+		return newFieldError("Signature", err)
+	}
+	// Deserialize `Amount`:
+	err = decoder.Decode(&p.Amount)
+	if err != nil {
+		return newFieldError("Amount", err)
+	}
+	return nil
+}
+
+func (p *PartialVoucher) Unmarshal(buf []byte) error {
+	err := p.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
+	if err != nil {
+		return fmt.Errorf("error while unmarshaling PartialVoucher: %w", err)
+	}
+	return nil
+}
+
+func UnmarshalPartialVoucher(buf []byte) (*PartialVoucher, error) {
+	obj := new(PartialVoucher)
+	err := obj.Unmarshal(buf)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+
 type PausedMaskSet struct {
 	PausedMask uint8 `json:"paused_mask"`
 }

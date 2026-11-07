@@ -1511,6 +1511,51 @@ func newRedeemChannelVouchersInstruction(
 	), nil
 }
 
+// Builds a "redeem_channel_vouchers_partial" instruction.
+func newRedeemChannelVouchersPartialInstruction(
+	// Params:
+	vouchers []PartialVoucher,
+
+	// Accounts:
+	signer solana.PublicKey,
+	config solana.PublicKey,
+	node solana.PublicKey,
+) (solana.Instruction, error) {
+	buf__ := new(bytes.Buffer)
+	enc__ := binary.NewBorshEncoder(buf__)
+
+	// Encode the instruction discriminator.
+	err := enc__.WriteBytes(RedeemChannelVouchersPartialInstructionDiscriminator[:], false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to write instruction discriminator: %w", err)
+	}
+	{
+		// Serialize `vouchers`:
+		err = enc__.Encode(vouchers)
+		if err != nil {
+			return nil, newFieldError("vouchers", err)
+		}
+	}
+	accounts__ := solana.AccountMetaSlice{}
+
+	// Add the accounts to the instruction.
+	{
+		// Account 0 "signer": Read-only, Signer, Required
+		accounts__.Append(solana.NewAccountMeta(signer, false, true))
+		// Account 1 "config": Read-only, Non-signer, Required
+		accounts__.Append(solana.NewAccountMeta(config, false, false))
+		// Account 2 "node": Writable, Non-signer, Required
+		accounts__.Append(solana.NewAccountMeta(node, true, false))
+	}
+
+	// Create the instruction.
+	return solana.NewInstruction(
+		ProgramID,
+		accounts__,
+		buf__.Bytes(),
+	), nil
+}
+
 // Builds a "redeem_lease_streams" instruction.
 func newRedeemLeaseStreamsInstruction(
 	signer solana.PublicKey,
@@ -1552,6 +1597,51 @@ func newRedeemLeaseVouchersInstruction(
 
 	// Encode the instruction discriminator.
 	err := enc__.WriteBytes(RedeemLeaseVouchersInstructionDiscriminator[:], false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to write instruction discriminator: %w", err)
+	}
+	{
+		// Serialize `vouchers`:
+		err = enc__.Encode(vouchers)
+		if err != nil {
+			return nil, newFieldError("vouchers", err)
+		}
+	}
+	accounts__ := solana.AccountMetaSlice{}
+
+	// Add the accounts to the instruction.
+	{
+		// Account 0 "signer": Read-only, Signer, Required
+		accounts__.Append(solana.NewAccountMeta(signer, false, true))
+		// Account 1 "config": Read-only, Non-signer, Required
+		accounts__.Append(solana.NewAccountMeta(config, false, false))
+		// Account 2 "node": Writable, Non-signer, Required
+		accounts__.Append(solana.NewAccountMeta(node, true, false))
+	}
+
+	// Create the instruction.
+	return solana.NewInstruction(
+		ProgramID,
+		accounts__,
+		buf__.Bytes(),
+	), nil
+}
+
+// Builds a "redeem_lease_vouchers_partial" instruction.
+func newRedeemLeaseVouchersPartialInstruction(
+	// Params:
+	vouchers []PartialVoucher,
+
+	// Accounts:
+	signer solana.PublicKey,
+	config solana.PublicKey,
+	node solana.PublicKey,
+) (solana.Instruction, error) {
+	buf__ := new(bytes.Buffer)
+	enc__ := binary.NewBorshEncoder(buf__)
+
+	// Encode the instruction discriminator.
+	err := enc__.WriteBytes(RedeemLeaseVouchersPartialInstructionDiscriminator[:], false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to write instruction discriminator: %w", err)
 	}
@@ -3263,6 +3353,29 @@ func DecodeInstruction(accounts []*solana.AccountMeta, data []byte) (any, error)
 			return nil, fmt.Errorf("redeem_channel_vouchers: unexpected trailing instruction data: %d bytes", dec.Remaining())
 		}
 		return solana.NewInstruction(ProgramID, solana.AccountMetaSlice(accounts), data), nil
+	case len(data) >= len(RedeemChannelVouchersPartialInstructionDiscriminator) && bytes.Equal(data[:len(RedeemChannelVouchersPartialInstructionDiscriminator)], RedeemChannelVouchersPartialInstructionDiscriminator[:]):
+		if len(accounts) < 3 {
+			return nil, fmt.Errorf("redeem_channel_vouchers_partial: expected at least 3 accounts, got %d", len(accounts))
+		}
+		dec := binary.NewBorshDecoder(data[len(RedeemChannelVouchersPartialInstructionDiscriminator):])
+		{
+			length, err := dec.ReadLength()
+			if err != nil {
+				return nil, fmt.Errorf("redeem_channel_vouchers_partial: vouchers: %w", err)
+			}
+			for i := 0; i < length; i++ {
+				{
+					var value PartialVoucher
+					if err := dec.Decode(&value); err != nil {
+						return nil, fmt.Errorf("redeem_channel_vouchers_partial: vouchers: %w", err)
+					}
+				}
+			}
+		}
+		if dec.Remaining() != 0 {
+			return nil, fmt.Errorf("redeem_channel_vouchers_partial: unexpected trailing instruction data: %d bytes", dec.Remaining())
+		}
+		return solana.NewInstruction(ProgramID, solana.AccountMetaSlice(accounts), data), nil
 	case len(data) >= len(RedeemLeaseStreamsInstructionDiscriminator) && bytes.Equal(data[:len(RedeemLeaseStreamsInstructionDiscriminator)], RedeemLeaseStreamsInstructionDiscriminator[:]):
 		if len(accounts) < 3 {
 			return nil, fmt.Errorf("redeem_lease_streams: expected at least 3 accounts, got %d", len(accounts))
@@ -3292,6 +3405,29 @@ func DecodeInstruction(accounts []*solana.AccountMeta, data []byte) (any, error)
 		}
 		if dec.Remaining() != 0 {
 			return nil, fmt.Errorf("redeem_lease_vouchers: unexpected trailing instruction data: %d bytes", dec.Remaining())
+		}
+		return solana.NewInstruction(ProgramID, solana.AccountMetaSlice(accounts), data), nil
+	case len(data) >= len(RedeemLeaseVouchersPartialInstructionDiscriminator) && bytes.Equal(data[:len(RedeemLeaseVouchersPartialInstructionDiscriminator)], RedeemLeaseVouchersPartialInstructionDiscriminator[:]):
+		if len(accounts) < 3 {
+			return nil, fmt.Errorf("redeem_lease_vouchers_partial: expected at least 3 accounts, got %d", len(accounts))
+		}
+		dec := binary.NewBorshDecoder(data[len(RedeemLeaseVouchersPartialInstructionDiscriminator):])
+		{
+			length, err := dec.ReadLength()
+			if err != nil {
+				return nil, fmt.Errorf("redeem_lease_vouchers_partial: vouchers: %w", err)
+			}
+			for i := 0; i < length; i++ {
+				{
+					var value PartialVoucher
+					if err := dec.Decode(&value); err != nil {
+						return nil, fmt.Errorf("redeem_lease_vouchers_partial: vouchers: %w", err)
+					}
+				}
+			}
+		}
+		if dec.Remaining() != 0 {
+			return nil, fmt.Errorf("redeem_lease_vouchers_partial: unexpected trailing instruction data: %d bytes", dec.Remaining())
 		}
 		return solana.NewInstruction(ProgramID, solana.AccountMetaSlice(accounts), data), nil
 	case len(data) >= len(SetParamsInstructionDiscriminator) && bytes.Equal(data[:len(SetParamsInstructionDiscriminator)], SetParamsInstructionDiscriminator[:]):

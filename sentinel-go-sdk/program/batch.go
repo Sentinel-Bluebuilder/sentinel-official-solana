@@ -16,6 +16,9 @@ const (
 	BatchRedeemStreams
 	BatchFund
 	BatchSweep
+	// BatchRedeemPartialVouchers is redeem_channel_vouchers_partial. Each item carries the claimed
+	// amount next to the signed voucher, so it is 8 bytes larger than a BatchRedeemVouchers item.
+	BatchRedeemPartialVouchers
 )
 
 const (
@@ -41,6 +44,8 @@ const (
 	redeemStreamsPerItemBytes  = 33
 	redeemVouchersBaseBytes    = 269
 	redeemVouchersPerItemBytes = 105
+
+	redeemPartialVouchersPerItemBytes = redeemVouchersPerItemBytes + 8
 )
 
 var ErrBatchTooLarge = errors.New("batch too large")
@@ -61,6 +66,12 @@ func CapacityFor(kind BatchKind, maxBytes int) int {
 		}
 
 		return min((maxBytes-redeemVouchersBaseBytes)/redeemVouchersPerItemBytes, maxBatchAddresses)
+	case BatchRedeemPartialVouchers:
+		if maxBytes < redeemVouchersBaseBytes {
+			return 0
+		}
+
+		return min((maxBytes-redeemVouchersBaseBytes)/redeemPartialVouchersPerItemBytes, maxBatchAddresses)
 	case BatchRedeemStreams:
 		if maxBytes < redeemStreamsBaseBytes {
 			return 0
@@ -78,7 +89,7 @@ func CapacityFor(kind BatchKind, maxBytes int) int {
 
 func ComputeUnits(kind BatchKind, count int) uint32 {
 	switch kind {
-	case BatchRedeemVouchers:
+	case BatchRedeemVouchers, BatchRedeemPartialVouchers:
 		return RedeemVouchersBaseComputeUnits + uint32(count)*RedeemVouchersPerItemComputeUnits
 	case BatchRedeemStreams:
 		return RedeemStreamsBaseComputeUnits + uint32(count)*RedeemStreamsPerItemComputeUnits

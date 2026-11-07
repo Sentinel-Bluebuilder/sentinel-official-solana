@@ -4,6 +4,7 @@ package node_test
 
 import (
 	"bytes"
+	"encoding/binary"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -41,7 +42,7 @@ func TestRuntime_Redeem_BatchesWithinConfiguredTransactionLimit(t *testing.T) {
 
 	for _, owner := range owners {
 		address := seedChannel(t, r, home, owner, dvpn.PositionModeVoucher)
-		seedPosition(t, r, home, address, home.Loaded.Node.Redeem.ThresholdBaseUnits*2)
+		seedServedPosition(t, r, home, address, home.Loaded.Node.Redeem.ThresholdBaseUnits*2)
 	}
 
 	require.NoError(t, node.Redeem(t.Context(), r))
@@ -53,7 +54,7 @@ func TestRuntime_Redeem_DoesNotRetrySingleSubject(t *testing.T) {
 
 	r, home, _ := newRuntime(t)
 	address := seedChannel(t, r, home, home.OwnerKey, dvpn.PositionModeVoucher)
-	seedPosition(t, r, home, address, home.Loaded.Node.Redeem.ThresholdBaseUnits*2)
+	seedServedPosition(t, r, home, address, home.Loaded.Node.Redeem.ThresholdBaseUnits*2)
 
 	var attempts atomic.Int32
 
@@ -96,8 +97,8 @@ func TestRuntime_Redeem_PaymasterLeavesRoomForFeeTransfer(t *testing.T) {
 				Transfer: newFeeTransfer(t, home, paymasterKey.PublicKey()),
 			}
 			maxBytes := min(tc.maxBytes, solana.MaxTransactionSizeV1)
-			total := program.CapacityFor(program.BatchRedeemVouchers, maxBytes)
-			capacity := program.CapacityFor(program.BatchRedeemVouchers, maxBytes-paymaster.FeeTransferOverheadBytes)
+			total := program.CapacityFor(program.BatchRedeemPartialVouchers, maxBytes)
+			capacity := program.CapacityFor(program.BatchRedeemPartialVouchers, maxBytes-paymaster.FeeTransferOverheadBytes)
 			subjects := map[solana.PublicKey]bool{}
 
 			for range total {
@@ -105,7 +106,7 @@ func TestRuntime_Redeem_PaymasterLeavesRoomForFeeTransfer(t *testing.T) {
 				require.NoError(t, err)
 
 				address := seedChannel(t, r, home, owner, dvpn.PositionModeVoucher)
-				seedPosition(t, r, home, address, home.Loaded.Node.Redeem.ThresholdBaseUnits*2)
+				seedServedPosition(t, r, home, address, home.Loaded.Node.Redeem.ThresholdBaseUnits*2)
 				subjects[address] = true
 			}
 
@@ -133,7 +134,7 @@ func TestRuntime_Redeem_PaymasterLeavesRoomForFeeTransfer(t *testing.T) {
 
 				limit := transaction.Message.TransactionConfig.ComputeUnitLimit
 				require.NotNil(t, limit)
-				require.Equal(t, program.ComputeUnits(program.BatchRedeemVouchers, count)+paymaster.FeeTransferComputeUnits, *limit)
+				require.Equal(t, program.ComputeUnits(program.BatchRedeemPartialVouchers, count)+paymaster.FeeTransferComputeUnits, *limit)
 
 				counts = append(counts, count)
 			}
@@ -155,6 +156,8 @@ func TestRuntime_Redeem_PreservesReopenedPosition(t *testing.T) {
 		Signature:  signed.Signature[:],
 	})
 	require.NoError(t, err)
+	require.NoError(t, home.DB.Model(&node.Position{}).Where("address = ?", address.String()).
+		Update("settled", 200).Error)
 
 	var reopened atomic.Bool
 
@@ -204,7 +207,7 @@ func TestRuntime_Redeem_RedeemsClosingBelowThreshold(t *testing.T) {
 	r, home, _ := newRuntime(t)
 	address := seedChannel(t, r, home, home.OwnerKey, dvpn.PositionModeVoucher)
 	cumulative := home.Loaded.Node.Redeem.ThresholdBaseUnits / 2
-	seedPosition(t, r, home, address, cumulative)
+	seedServedPosition(t, r, home, address, cumulative)
 	require.NoError(t, home.DB.Model(&node.Position{}).Where("address = ?", address.String()).Updates(map[string]any{
 		"accepted_unix": time.Now().Unix(),
 		"status":        node.PositionStatusClosing,
@@ -227,8 +230,8 @@ func TestRuntime_Redeem_RetriesFailedBatchAsSingles(t *testing.T) {
 	addressA := seedChannel(t, r, home, home.OwnerKey, dvpn.PositionModeVoucher)
 	addressB := seedChannel(t, r, home, ownerB, dvpn.PositionModeVoucher)
 	cumulative := home.Loaded.Node.Redeem.ThresholdBaseUnits * 2
-	seedPosition(t, r, home, addressA, cumulative)
-	seedPosition(t, r, home, addressB, cumulative)
+	seedServedPosition(t, r, home, addressA, cumulative)
+	seedServedPosition(t, r, home, addressB, cumulative)
 	subjects := map[solana.PublicKey]bool{addressA: true, addressB: true}
 
 	var (
@@ -305,8 +308,8 @@ func TestRuntime_Redeem_SendsBatchAndAdvancesPositions(t *testing.T) {
 	addressA := seedChannel(t, r, home, home.OwnerKey, dvpn.PositionModeVoucher)
 	addressB := seedChannel(t, r, home, ownerB, dvpn.PositionModeVoucher)
 	cumulative := home.Loaded.Node.Redeem.ThresholdBaseUnits * 2
-	seedPosition(t, r, home, addressA, cumulative)
-	seedPosition(t, r, home, addressB, cumulative)
+	seedServedPosition(t, r, home, addressA, cumulative)
+	seedServedPosition(t, r, home, addressB, cumulative)
 	require.NoError(t, node.Redeem(t.Context(), r))
 
 	sent := home.RPC.Sent()
@@ -360,6 +363,79 @@ func TestRuntime_Redeem_SkipsSweepWithoutFees(t *testing.T) {
 			require.False(t, bytes.HasPrefix(instruction.Data, dvpn.SweepNodeFeesInstructionDiscriminator[:]))
 		}
 	}
+}
+
+// seedServedPosition seeds a channel voucher the node has fully served, so the whole voucher is
+// redeemable.
+func seedServedPosition(
+	t *testing.T, r *node.Runtime, home testutil.Home, address solana.PublicKey, cumulative uint64,
+) {
+	t.Helper()
+
+	seedPosition(t, r, home, address, cumulative)
+	require.NoError(t, home.DB.Model(&node.Position{}).Where("address = ?", address.String()).
+		Update("settled", cumulative).Error)
+}
+
+// partialClaims reads the claimed amounts out of a redeem_channel_vouchers_partial instruction.
+func partialClaims(t *testing.T, data []byte) []uint64 {
+	t.Helper()
+
+	discriminator := dvpn.RedeemChannelVouchersPartialInstructionDiscriminator[:]
+	require.True(t, bytes.HasPrefix(data, discriminator))
+
+	const itemBytes = 8 + 64 + 8
+
+	body := data[len(discriminator):]
+	count := int(binary.LittleEndian.Uint32(body))
+	require.Len(t, body, 4+count*itemBytes)
+
+	claims := make([]uint64, 0, count)
+	for i := range count {
+		item := body[4+i*itemBytes:]
+		claims = append(claims, binary.LittleEndian.Uint64(item[8+64:]))
+	}
+
+	return claims
+}
+
+func TestRuntime_Redeem_ClaimsOnlyMeteredChannelCredit(t *testing.T) {
+	t.Parallel()
+
+	r, home, _ := newRuntime(t)
+	address := seedChannel(t, r, home, home.OwnerKey, dvpn.PositionModeVoucher)
+	threshold := home.Loaded.Node.Redeem.ThresholdBaseUnits
+	seedPosition(t, r, home, address, threshold*10)
+	require.NoError(t, home.DB.Model(&node.Position{}).Where("address = ?", address.String()).
+		Update("settled", threshold*2).Error)
+
+	require.NoError(t, node.Redeem(t.Context(), r))
+
+	sent := home.RPC.Sent()
+	require.Len(t, sent, 1)
+	require.Equal(t, []uint64{threshold * 2}, partialClaims(t, sent[0].Message.Instructions[0].Data))
+
+	var position node.Position
+	require.NoError(t, home.DB.First(&position, "address = ?", address.String()).Error)
+	require.Equal(t, threshold*2, position.Redeemed)
+	require.Equal(t, threshold*10, position.Cumulative)
+}
+
+func TestRuntime_Redeem_SkipsUnservedChannelVoucher(t *testing.T) {
+	t.Parallel()
+
+	r, home, _ := newRuntime(t)
+	address := seedChannel(t, r, home, home.OwnerKey, dvpn.PositionModeVoucher)
+	seedPosition(t, r, home, address, home.Loaded.Node.Redeem.ThresholdBaseUnits*10)
+	require.NoError(t, home.DB.Model(&node.Position{}).Where("address = ?", address.String()).
+		Update("status", node.PositionStatusClosing).Error)
+
+	require.NoError(t, node.Redeem(t.Context(), r))
+	require.Empty(t, home.RPC.Sent())
+
+	var position node.Position
+	require.NoError(t, home.DB.First(&position, "address = ?", address.String()).Error)
+	require.Zero(t, position.Redeemed)
 }
 
 func newFeeTransfer(t *testing.T, home testutil.Home, paymasterAddress solana.PublicKey) sdktest.FakeFeeTransfer {

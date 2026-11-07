@@ -2638,6 +2638,66 @@ func newRedeemChannelVouchersCmd(r cli.Runner) *cobra.Command {
 	return cmd
 }
 
+func newRedeemChannelVouchersPartialCmd(r cli.Runner) *cobra.Command {
+	var p RedeemChannelVouchersPartialParams
+
+	cmd := &cobra.Command{
+		Use:   "redeem-channel-vouchers-partial",
+		Short: "redeem channel vouchers partial",
+		Args:  cobra.NoArgs,
+	}
+
+	cli.Var(cmd.Flags(), &p.Vouchers, "vouchers", "vouchers", "json", cli.ParseJSON[[]PartialVoucher])
+	cli.Var(cmd.Flags(), &p.Node, "node", "node", "address", cli.ParsePublicKey)
+	cli.SliceVar(cmd.Flags(), &p.RemainingAccounts, "remaining-account", "remaining account as public-key[:w][:s]", "account-meta", cli.ParseAccountMeta)
+
+	cmd.RunE = func(cmd *cobra.Command, _ []string) error {
+		ctx := cmdContext(cmd)
+
+		if err := cli.Require(cmd.Flags(), "vouchers"); err != nil {
+			return err
+		}
+
+		signer, err := r.Signer(ctx)
+		if err != nil {
+			return err
+		}
+
+		p.Signer = signer
+
+		if p.Node.IsZero() {
+			if k, ok := r.Account("node"); ok {
+				p.Node = k
+			}
+		}
+
+		if p.Signer.IsZero() {
+			return fmt.Errorf("%w: --%s", cli.ErrMissingFlag, "signer")
+		}
+
+		if p.Node.IsZero() {
+			return fmt.Errorf("%w: --%s", cli.ErrMissingFlag, "node")
+		}
+
+		ix, err := BuildRedeemChannelVouchersPartialInstruction(r.ProgramID(), p)
+		if err != nil {
+			return err
+		}
+
+		if k := ix.Accounts()[0]; k == nil || k.PublicKey.IsZero() {
+			return fmt.Errorf("%w: --%s", cli.ErrMissingFlag, "signer")
+		}
+
+		if k := ix.Accounts()[2]; k == nil || k.PublicKey.IsZero() {
+			return fmt.Errorf("%w: --%s", cli.ErrMissingFlag, "node")
+		}
+
+		return r.Run(ctx, "redeem_channel_vouchers_partial", ix)
+	}
+
+	return cmd
+}
+
 func newRedeemLeaseStreamsCmd(r cli.Runner) *cobra.Command {
 	var p RedeemLeaseStreamsParams
 
@@ -2748,6 +2808,66 @@ func newRedeemLeaseVouchersCmd(r cli.Runner) *cobra.Command {
 		}
 
 		return r.Run(ctx, "redeem_lease_vouchers", ix)
+	}
+
+	return cmd
+}
+
+func newRedeemLeaseVouchersPartialCmd(r cli.Runner) *cobra.Command {
+	var p RedeemLeaseVouchersPartialParams
+
+	cmd := &cobra.Command{
+		Use:   "redeem-lease-vouchers-partial",
+		Short: "redeem lease vouchers partial",
+		Args:  cobra.NoArgs,
+	}
+
+	cli.Var(cmd.Flags(), &p.Vouchers, "vouchers", "vouchers", "json", cli.ParseJSON[[]PartialVoucher])
+	cli.Var(cmd.Flags(), &p.Node, "node", "node", "address", cli.ParsePublicKey)
+	cli.SliceVar(cmd.Flags(), &p.RemainingAccounts, "remaining-account", "remaining account as public-key[:w][:s]", "account-meta", cli.ParseAccountMeta)
+
+	cmd.RunE = func(cmd *cobra.Command, _ []string) error {
+		ctx := cmdContext(cmd)
+
+		if err := cli.Require(cmd.Flags(), "vouchers"); err != nil {
+			return err
+		}
+
+		signer, err := r.Signer(ctx)
+		if err != nil {
+			return err
+		}
+
+		p.Signer = signer
+
+		if p.Node.IsZero() {
+			if k, ok := r.Account("node"); ok {
+				p.Node = k
+			}
+		}
+
+		if p.Signer.IsZero() {
+			return fmt.Errorf("%w: --%s", cli.ErrMissingFlag, "signer")
+		}
+
+		if p.Node.IsZero() {
+			return fmt.Errorf("%w: --%s", cli.ErrMissingFlag, "node")
+		}
+
+		ix, err := BuildRedeemLeaseVouchersPartialInstruction(r.ProgramID(), p)
+		if err != nil {
+			return err
+		}
+
+		if k := ix.Accounts()[0]; k == nil || k.PublicKey.IsZero() {
+			return fmt.Errorf("%w: --%s", cli.ErrMissingFlag, "signer")
+		}
+
+		if k := ix.Accounts()[2]; k == nil || k.PublicKey.IsZero() {
+			return fmt.Errorf("%w: --%s", cli.ErrMissingFlag, "node")
+		}
+
+		return r.Run(ctx, "redeem_lease_vouchers_partial", ix)
 	}
 
 	return cmd
@@ -5705,8 +5825,10 @@ func Commands(r cli.Runner) []*cobra.Command {
 		newProposeAuthorityCmd(r),
 		newRedeemChannelStreamsCmd(r),
 		newRedeemChannelVouchersCmd(r),
+		newRedeemChannelVouchersPartialCmd(r),
 		newRedeemLeaseStreamsCmd(r),
 		newRedeemLeaseVouchersCmd(r),
+		newRedeemLeaseVouchersPartialCmd(r),
 		newSetParamsCmd(r),
 		newSetPausedMaskCmd(r),
 		newSetTreasuryCmd(r),

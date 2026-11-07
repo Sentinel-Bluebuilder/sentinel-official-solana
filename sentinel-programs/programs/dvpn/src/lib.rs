@@ -11,7 +11,7 @@ use dvpn_core::args::{ConfigParamsUpdate, InitialConfigParams, NodePrices};
 use dvpn_core::enums::{
     ListingStatus, PositionMode, PositionStatus, PositionTerms, SubscriptionCloseReason,
 };
-use dvpn_core::voucher::Voucher;
+use dvpn_core::voucher::{PartialVoucher, Voucher};
 use instructions::*;
 
 pub mod auth;
@@ -458,6 +458,13 @@ pub mod dvpn {
         instructions::redeem_channel_vouchers(ctx, vouchers)
     }
 
+    pub fn redeem_channel_vouchers_partial(
+        ctx: Context<RedeemChannelVouchers>,
+        vouchers: Vec<PartialVoucher>,
+    ) -> Result<()> {
+        instructions::redeem_channel_vouchers_partial(ctx, vouchers)
+    }
+
     pub fn redeem_channel_streams(ctx: Context<RedeemChannelStreams>) -> Result<()> {
         instructions::redeem_channel_streams(ctx)
     }
@@ -489,6 +496,13 @@ pub mod dvpn {
         vouchers: Vec<Voucher>,
     ) -> Result<()> {
         instructions::redeem_lease_vouchers(ctx, vouchers)
+    }
+
+    pub fn redeem_lease_vouchers_partial(
+        ctx: Context<RedeemLeaseVouchers>,
+        vouchers: Vec<PartialVoucher>,
+    ) -> Result<()> {
+        instructions::redeem_lease_vouchers_partial(ctx, vouchers)
     }
 
     pub fn redeem_lease_streams(ctx: Context<RedeemLeaseStreams>) -> Result<()> {

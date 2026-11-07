@@ -6,7 +6,7 @@ use dvpn_core::permissions::{
     PERM_CLOSE_CHANNEL, PERM_FUND_CHANNELS, PERM_OPEN_CHANNEL, PERM_START_CLOSE_CHANNEL,
 };
 use dvpn_core::seeds::{CHANNEL_SEED, CONFIG_SEED, GRANT_SEED, NODE_SEED, USER_SEED};
-use dvpn_core::voucher::{Voucher, channel_voucher_message};
+use dvpn_core::voucher::{PartialVoucher, Voucher, channel_voucher_message};
 
 use crate::error::DvpnError;
 use crate::state::{Channel, Config, Grant, Node, User};
@@ -343,6 +343,21 @@ pub fn redeem_channel_vouchers(
     ctx: Context<RedeemChannelVouchers>,
     vouchers: Vec<Voucher>,
 ) -> Result<()> {
+    redeem_channel_claims(ctx, vouchers.into_iter().map(PartialVoucher::from).collect())
+}
+
+/// Like `redeem_channel_vouchers`, but each voucher claims only `amount` of its signed total.
+pub fn redeem_channel_vouchers_partial(
+    ctx: Context<RedeemChannelVouchers>,
+    vouchers: Vec<PartialVoucher>,
+) -> Result<()> {
+    redeem_channel_claims(ctx, vouchers)
+}
+
+fn redeem_channel_claims(
+    ctx: Context<RedeemChannelVouchers>,
+    vouchers: Vec<PartialVoucher>,
+) -> Result<()> {
     let fee_bps = ctx.accounts.config.fee_bps;
     let remaining = ctx.remaining_accounts;
     batch::require_sorted_unique(remaining)?;
@@ -371,11 +386,15 @@ pub fn redeem_channel_vouchers(
             voucher.cumulative_amount <= channel.escrow,
             DvpnError::VoucherExceedsEscrow
         );
-        if voucher.cumulative_amount <= channel.redeemed {
+        require!(
+            voucher.amount <= voucher.cumulative_amount,
+            DvpnError::VoucherClaimExceedsSigned
+        );
+        if voucher.amount <= channel.redeemed {
             continue;
         }
         let gross_amount = voucher
-            .cumulative_amount
+            .amount
             .checked_sub(channel.redeemed)
             .ok_or_else(|| error!(DvpnError::ArithmeticOverflow))?;
         let fee = fee::fee_amount(gross_amount, fee_bps)?;
@@ -391,7 +410,7 @@ pub fn redeem_channel_vouchers(
             .fees_accrued
             .checked_add(fee)
             .ok_or_else(|| error!(DvpnError::ArithmeticOverflow))?;
-        channel.redeemed = voucher.cumulative_amount;
+        channel.redeemed = voucher.amount;
         redeemed_any = true;
         emit!(events::ChannelVoucherRedeemed {
             channel: channel.key(),

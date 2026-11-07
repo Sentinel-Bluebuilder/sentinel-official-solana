@@ -823,6 +823,27 @@ func BuildRedeemChannelVouchersInstruction(programID solana.PublicKey, p RedeemC
 	return core.WithProgramID(ix, programID, p.RemainingAccounts), nil
 }
 
+type RedeemChannelVouchersPartialParams struct {
+	Vouchers          []PartialVoucher
+	Signer            solana.PublicKey
+	Node              solana.PublicKey
+	RemainingAccounts []*solana.AccountMeta
+}
+
+func BuildRedeemChannelVouchersPartialInstruction(programID solana.PublicKey, p RedeemChannelVouchersPartialParams) (solana.Instruction, error) {
+	config, _, err := FindConfigAddress(programID)
+	if err != nil {
+		return nil, err
+	}
+
+	ix, err := newRedeemChannelVouchersPartialInstruction(p.Vouchers, p.Signer, config, p.Node)
+	if err != nil {
+		return nil, err
+	}
+
+	return core.WithProgramID(ix, programID, p.RemainingAccounts), nil
+}
+
 type RedeemLeaseStreamsParams struct {
 	Signer            solana.PublicKey
 	Node              solana.PublicKey
@@ -857,6 +878,27 @@ func BuildRedeemLeaseVouchersInstruction(programID solana.PublicKey, p RedeemLea
 	}
 
 	ix, err := newRedeemLeaseVouchersInstruction(p.Vouchers, p.Signer, config, p.Node)
+	if err != nil {
+		return nil, err
+	}
+
+	return core.WithProgramID(ix, programID, p.RemainingAccounts), nil
+}
+
+type RedeemLeaseVouchersPartialParams struct {
+	Vouchers          []PartialVoucher
+	Signer            solana.PublicKey
+	Node              solana.PublicKey
+	RemainingAccounts []*solana.AccountMeta
+}
+
+func BuildRedeemLeaseVouchersPartialInstruction(programID solana.PublicKey, p RedeemLeaseVouchersPartialParams) (solana.Instruction, error) {
+	config, _, err := FindConfigAddress(programID)
+	if err != nil {
+		return nil, err
+	}
+
+	ix, err := newRedeemLeaseVouchersPartialInstruction(p.Vouchers, p.Signer, config, p.Node)
 	if err != nil {
 		return nil, err
 	}

@@ -2995,6 +2995,82 @@
       ]
     },
     {
+      "name": "redeem_channel_vouchers_partial",
+      "discriminator": [
+        234,
+        220,
+        142,
+        84,
+        250,
+        138,
+        102,
+        130
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "node",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  110,
+                  111,
+                  100,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "node.owner",
+                "account": "Node"
+              },
+              {
+                "kind": "account",
+                "path": "node.node_id",
+                "account": "Node"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "vouchers",
+          "type": {
+            "vec": {
+              "defined": {
+                "name": "PartialVoucher"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "redeem_lease_streams",
       "discriminator": [
         9,
@@ -3129,6 +3205,82 @@
             "vec": {
               "defined": {
                 "name": "Voucher"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "redeem_lease_vouchers_partial",
+      "discriminator": [
+        27,
+        50,
+        169,
+        44,
+        72,
+        150,
+        22,
+        62
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "node",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  110,
+                  111,
+                  100,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "node.owner",
+                "account": "Node"
+              },
+              {
+                "kind": "account",
+                "path": "node.node_id",
+                "account": "Node"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "vouchers",
+          "type": {
+            "vec": {
+              "defined": {
+                "name": "PartialVoucher"
               }
             }
           }
@@ -5760,6 +5912,11 @@
       "code": 6050,
       "name": "InvalidRentRecipient",
       "msg": "rent recipient is neither the signer nor the rent payer"
+    },
+    {
+      "code": 6051,
+      "name": "VoucherClaimExceedsSigned",
+      "msg": "voucher claim exceeds the signed amount"
     }
   ],
   "types": [
@@ -7317,6 +7474,36 @@
           {
             "name": "node_listing_ttl_seconds",
             "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PartialVoucher",
+      "docs": [
+        "A voucher redeemed for less than it was signed for. The signature over `cumulative_amount`",
+        "authorizes the node to take up to that total; `amount` is the total it claims, so the rest",
+        "of the escrow stays with the client and is returned at close."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "cumulative_amount",
+            "type": "u64"
+          },
+          {
+            "name": "signature",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          },
+          {
+            "name": "amount",
+            "type": "u64"
           }
         ]
       }

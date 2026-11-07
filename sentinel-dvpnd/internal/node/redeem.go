@@ -40,6 +40,23 @@ type redeemSubject struct {
 	nodeOpenedUnix int64
 	openedUnix     int64
 	voucher        dvpn.Voucher
+	// claim is the cumulative total this redemption takes: the whole voucher for a lease, and
+	// for a channel only what the node metered (see channelClaim).
+	claim uint64
+}
+
+// channelClaim is what the node redeems on a channel voucher: the credit its own meter has used
+// (settled plus the live usage of active sessions), never more than the client signed. The rest of
+// the client's prepay lead stays in escrow and close_channel returns it to the client.
+func (r *Runtime) channelClaim(ctx context.Context, position *Position) uint64 {
+	settled, err := r.projectedSettled(ctx, position)
+	if err != nil {
+		r.log.Warn().Err(err).Str("position", position.Address).Msg("projecting settled credit; claiming the settled amount")
+
+		settled = position.Settled
+	}
+
+	return min(position.Cumulative, settled)
 }
 
 func (r *Runtime) buildRedeemInstruction(group *redeemGroup, subjects []solana.PublicKey) (solana.Instruction, error) {
@@ -48,21 +65,26 @@ func (r *Runtime) buildRedeemInstruction(group *redeemGroup, subjects []solana.P
 
 	switch group.key {
 	case groupKey(KindChannel, dvpn.PositionModeVoucher):
-		vouchers := make([]dvpn.Voucher, 0, len(sorted))
+		vouchers := make([]dvpn.PartialVoucher, 0, len(sorted))
 		for _, subject := range sorted {
-			vouchers = append(vouchers, group.subjects[subject].voucher)
+			redeemed := group.subjects[subject]
+			vouchers = append(vouchers, dvpn.PartialVoucher{
+				CumulativeAmount: redeemed.voucher.CumulativeAmount,
+				Signature:        redeemed.voucher.Signature,
+				Amount:           redeemed.claim,
+			})
 		}
 
-		params := dvpn.RedeemChannelVouchersParams{
+		params := dvpn.RedeemChannelVouchersPartialParams{
 			Node:              r.address,
 			RemainingAccounts: remaining,
 			Signer:            r.signer,
 			Vouchers:          vouchers,
 		}
 
-		instruction, err := dvpn.BuildRedeemChannelVouchersInstruction(r.programClient.ProgramID, params)
+		instruction, err := dvpn.BuildRedeemChannelVouchersPartialInstruction(r.programClient.ProgramID, params)
 		if err != nil {
-			return nil, fmt.Errorf("building redeem_channel_vouchers instruction: %w", err)
+			return nil, fmt.Errorf("building redeem_channel_vouchers_partial instruction: %w", err)
 		}
 
 		return instruction, nil
@@ -149,6 +171,11 @@ func (r *Runtime) groupDuePositions(
 		position := positions[i]
 		value := position.Cumulative - min(position.Cumulative, position.Redeemed)
 
+		if position.Kind == KindChannel && position.Mode == dvpn.PositionModeVoucher {
+			claim := r.channelClaim(ctx, &position)
+			value = claim - min(claim, position.Redeemed)
+		}
+
 		age := now - position.AcceptedUnix
 		if position.Mode == dvpn.PositionModeStream {
 			accrued := program.StreamAccrued(
@@ -181,7 +208,7 @@ func (r *Runtime) groupDuePositions(
 		if !ok {
 			group = &redeemGroup{
 				key:          key,
-				kind:         batchKind(fresh.Mode),
+				kind:         batchKind(fresh.Kind, fresh.Mode),
 				positionKind: fresh.Kind,
 				mode:         fresh.Mode,
 				subjects:     map[solana.PublicKey]redeemSubject{},
@@ -203,7 +230,12 @@ func (r *Runtime) groupDuePositions(
 			continue
 		}
 
-		if len(fresh.Signature) == 0 || fresh.Cumulative <= fresh.Redeemed {
+		subject.claim = fresh.Cumulative
+		if fresh.Kind == KindChannel {
+			subject.claim = r.channelClaim(ctx, fresh)
+		}
+
+		if len(fresh.Signature) == 0 || subject.claim <= fresh.Redeemed {
 			continue
 		}
 
@@ -298,8 +330,8 @@ func (r *Runtime) redeemBatch(ctx context.Context, group *redeemGroup, subjects 
 		redeemed := group.subjects[subject]
 
 		updates := map[string]any{"redeemed_unix": now}
-		if redeemed.voucher.CumulativeAmount != 0 {
-			updates["redeemed"] = redeemed.voucher.CumulativeAmount
+		if redeemed.claim != 0 {
+			updates["redeemed"] = redeemed.claim
 		}
 
 		if err := r.db.WithContext(ctx).Model(&Position{}).Where(map[string]any{
@@ -438,9 +470,13 @@ func (r *Runtime) sweepFees(ctx context.Context) error {
 	return err
 }
 
-func batchKind(mode uint8) program.BatchKind {
+func batchKind(kind string, mode uint8) program.BatchKind {
 	if mode == dvpn.PositionModeStream {
 		return program.BatchRedeemStreams
+	}
+
+	if kind == KindChannel {
+		return program.BatchRedeemPartialVouchers
 	}
 
 	return program.BatchRedeemVouchers

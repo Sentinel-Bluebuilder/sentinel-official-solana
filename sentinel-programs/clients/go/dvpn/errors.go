@@ -92,57 +92,58 @@ func toUint32(v any) (uint32, bool) {
 }
 
 var (
-	ErrUnauthorized             = &Error{Code: 6000, Name: "Unauthorized", Message: "signer is not authorized for this action"}
-	ErrOperationPaused          = &Error{Code: 6001, Name: "OperationPaused", Message: "this operation is paused"}
-	ErrFeeBpsOutOfRange         = &Error{Code: 6002, Name: "FeeBpsOutOfRange", Message: "fee bps out of range"}
-	ErrParamOutOfRange          = &Error{Code: 6003, Name: "ParamOutOfRange", Message: "parameter out of range"}
-	ErrMissingPendingAuthority  = &Error{Code: 6004, Name: "MissingPendingAuthority", Message: "pending authority is missing"}
-	ErrInvalidMint              = &Error{Code: 6005, Name: "InvalidMint", Message: "mint is invalid"}
-	ErrMintExtensionForbidden   = &Error{Code: 6006, Name: "MintExtensionForbidden", Message: "mint has a forbidden extension"}
-	ErrMintNotSealed            = &Error{Code: 6007, Name: "MintNotSealed", Message: "mint is not sealed"}
-	ErrVaultNotAssociated       = &Error{Code: 6008, Name: "VaultNotAssociated", Message: "vault is not the config associated token account"}
-	ErrVaultNotImmutable        = &Error{Code: 6009, Name: "VaultNotImmutable", Message: "vault is not immutable-owner"}
-	ErrInvalidTreasury          = &Error{Code: 6010, Name: "InvalidTreasury", Message: "treasury may not be the vault or config-owned"}
-	ErrBondBelowMinimum         = &Error{Code: 6011, Name: "BondBelowMinimum", Message: "bond below minimum"}
-	ErrBondPending              = &Error{Code: 6012, Name: "BondPending", Message: "a parked bond is pending for this id"}
-	ErrUnbondingNotElapsed      = &Error{Code: 6013, Name: "UnbondingNotElapsed", Message: "unbonding window not elapsed"}
-	ErrURITooLong               = &Error{Code: 6014, Name: "UriTooLong", Message: "uri too long"}
-	ErrNodeNotListed            = &Error{Code: 6015, Name: "NodeNotListed", Message: "node is not listed"}
-	ErrNodeNotLive              = &Error{Code: 6016, Name: "NodeNotLive", Message: "node is not live"}
-	ErrNodePriceChanged         = &Error{Code: 6017, Name: "NodePriceChanged", Message: "node price changed"}
-	ErrInsufficientRevenue      = &Error{Code: 6018, Name: "InsufficientRevenue", Message: "insufficient revenue"}
-	ErrFeesZero                 = &Error{Code: 6019, Name: "FeesZero", Message: "fees to sweep are zero"}
-	ErrProviderNotListed        = &Error{Code: 6020, Name: "ProviderNotListed", Message: "provider is not listed"}
-	ErrOpenPlansRemain          = &Error{Code: 6021, Name: "OpenPlansRemain", Message: "open plans remain"}
-	ErrOpenLeasesRemain         = &Error{Code: 6022, Name: "OpenLeasesRemain", Message: "open leases remain"}
-	ErrBalanceZero              = &Error{Code: 6023, Name: "BalanceZero", Message: "balance to withdraw is zero"}
-	ErrAmountExceedsAllowance   = &Error{Code: 6024, Name: "AmountExceedsAllowance", Message: "amount exceeds allowance"}
-	ErrPlanNotListed            = &Error{Code: 6025, Name: "PlanNotListed", Message: "plan is not listed"}
-	ErrPlanNotDelisted          = &Error{Code: 6026, Name: "PlanNotDelisted", Message: "plan is not delisted"}
-	ErrPlanTermsChanged         = &Error{Code: 6027, Name: "PlanTermsChanged", Message: "plan terms changed"}
-	ErrSubscriptionNotExpired   = &Error{Code: 6028, Name: "SubscriptionNotExpired", Message: "subscription not expired"}
-	ErrSubscriptionPriceNotZero = &Error{Code: 6029, Name: "SubscriptionPriceNotZero", Message: "subscription price is not zero"}
-	ErrLeaseNotOpen             = &Error{Code: 6030, Name: "LeaseNotOpen", Message: "lease is not open"}
-	ErrLeaseNotClosing          = &Error{Code: 6031, Name: "LeaseNotClosing", Message: "lease is not closing"}
-	ErrChannelNotOpen           = &Error{Code: 6032, Name: "ChannelNotOpen", Message: "channel is not open"}
-	ErrChannelNotClosing        = &Error{Code: 6033, Name: "ChannelNotClosing", Message: "channel is not closing"}
-	ErrVoucherExceedsEscrow     = &Error{Code: 6034, Name: "VoucherExceedsEscrow", Message: "voucher exceeds escrow"}
-	ErrGraceNotElapsed          = &Error{Code: 6035, Name: "GraceNotElapsed", Message: "grace window not elapsed"}
-	ErrRedeemableZero           = &Error{Code: 6036, Name: "RedeemableZero", Message: "redeemable amount is zero"}
-	ErrModeNotVoucher           = &Error{Code: 6037, Name: "ModeNotVoucher", Message: "position mode is not voucher"}
-	ErrModeNotStream            = &Error{Code: 6038, Name: "ModeNotStream", Message: "position mode is not stream"}
-	ErrInvalidVoucherSignature  = &Error{Code: 6039, Name: "InvalidVoucherSignature", Message: "voucher signature is invalid"}
-	ErrBatchLengthMismatch      = &Error{Code: 6040, Name: "BatchLengthMismatch", Message: "batch length mismatch"}
-	ErrBatchNotSorted           = &Error{Code: 6041, Name: "BatchNotSorted", Message: "batch not sorted"}
-	ErrNodeReopened             = &Error{Code: 6042, Name: "NodeReopened", Message: "position belongs to an earlier incarnation of this node"}
-	ErrArithmeticOverflow       = &Error{Code: 6043, Name: "ArithmeticOverflow", Message: "arithmetic overflow"}
-	ErrVaultFrozen              = &Error{Code: 6044, Name: "VaultFrozen", Message: "vault is frozen"}
-	ErrGrantExpired             = &Error{Code: 6045, Name: "GrantExpired", Message: "grant has expired"}
-	ErrPermissionNotGranted     = &Error{Code: 6046, Name: "PermissionNotGranted", Message: "grant does not include the permission for this action"}
-	ErrGrantTargetMismatch      = &Error{Code: 6047, Name: "GrantTargetMismatch", Message: "grant target does not cover this account"}
-	ErrInvalidVoucherSigner     = &Error{Code: 6048, Name: "InvalidVoucherSigner", Message: "voucher signer is not a valid key"}
-	ErrMissingRentRecipient     = &Error{Code: 6049, Name: "MissingRentRecipient", Message: "rent recipient is missing"}
-	ErrInvalidRentRecipient     = &Error{Code: 6050, Name: "InvalidRentRecipient", Message: "rent recipient is neither the signer nor the rent payer"}
+	ErrUnauthorized              = &Error{Code: 6000, Name: "Unauthorized", Message: "signer is not authorized for this action"}
+	ErrOperationPaused           = &Error{Code: 6001, Name: "OperationPaused", Message: "this operation is paused"}
+	ErrFeeBpsOutOfRange          = &Error{Code: 6002, Name: "FeeBpsOutOfRange", Message: "fee bps out of range"}
+	ErrParamOutOfRange           = &Error{Code: 6003, Name: "ParamOutOfRange", Message: "parameter out of range"}
+	ErrMissingPendingAuthority   = &Error{Code: 6004, Name: "MissingPendingAuthority", Message: "pending authority is missing"}
+	ErrInvalidMint               = &Error{Code: 6005, Name: "InvalidMint", Message: "mint is invalid"}
+	ErrMintExtensionForbidden    = &Error{Code: 6006, Name: "MintExtensionForbidden", Message: "mint has a forbidden extension"}
+	ErrMintNotSealed             = &Error{Code: 6007, Name: "MintNotSealed", Message: "mint is not sealed"}
+	ErrVaultNotAssociated        = &Error{Code: 6008, Name: "VaultNotAssociated", Message: "vault is not the config associated token account"}
+	ErrVaultNotImmutable         = &Error{Code: 6009, Name: "VaultNotImmutable", Message: "vault is not immutable-owner"}
+	ErrInvalidTreasury           = &Error{Code: 6010, Name: "InvalidTreasury", Message: "treasury may not be the vault or config-owned"}
+	ErrBondBelowMinimum          = &Error{Code: 6011, Name: "BondBelowMinimum", Message: "bond below minimum"}
+	ErrBondPending               = &Error{Code: 6012, Name: "BondPending", Message: "a parked bond is pending for this id"}
+	ErrUnbondingNotElapsed       = &Error{Code: 6013, Name: "UnbondingNotElapsed", Message: "unbonding window not elapsed"}
+	ErrURITooLong                = &Error{Code: 6014, Name: "UriTooLong", Message: "uri too long"}
+	ErrNodeNotListed             = &Error{Code: 6015, Name: "NodeNotListed", Message: "node is not listed"}
+	ErrNodeNotLive               = &Error{Code: 6016, Name: "NodeNotLive", Message: "node is not live"}
+	ErrNodePriceChanged          = &Error{Code: 6017, Name: "NodePriceChanged", Message: "node price changed"}
+	ErrInsufficientRevenue       = &Error{Code: 6018, Name: "InsufficientRevenue", Message: "insufficient revenue"}
+	ErrFeesZero                  = &Error{Code: 6019, Name: "FeesZero", Message: "fees to sweep are zero"}
+	ErrProviderNotListed         = &Error{Code: 6020, Name: "ProviderNotListed", Message: "provider is not listed"}
+	ErrOpenPlansRemain           = &Error{Code: 6021, Name: "OpenPlansRemain", Message: "open plans remain"}
+	ErrOpenLeasesRemain          = &Error{Code: 6022, Name: "OpenLeasesRemain", Message: "open leases remain"}
+	ErrBalanceZero               = &Error{Code: 6023, Name: "BalanceZero", Message: "balance to withdraw is zero"}
+	ErrAmountExceedsAllowance    = &Error{Code: 6024, Name: "AmountExceedsAllowance", Message: "amount exceeds allowance"}
+	ErrPlanNotListed             = &Error{Code: 6025, Name: "PlanNotListed", Message: "plan is not listed"}
+	ErrPlanNotDelisted           = &Error{Code: 6026, Name: "PlanNotDelisted", Message: "plan is not delisted"}
+	ErrPlanTermsChanged          = &Error{Code: 6027, Name: "PlanTermsChanged", Message: "plan terms changed"}
+	ErrSubscriptionNotExpired    = &Error{Code: 6028, Name: "SubscriptionNotExpired", Message: "subscription not expired"}
+	ErrSubscriptionPriceNotZero  = &Error{Code: 6029, Name: "SubscriptionPriceNotZero", Message: "subscription price is not zero"}
+	ErrLeaseNotOpen              = &Error{Code: 6030, Name: "LeaseNotOpen", Message: "lease is not open"}
+	ErrLeaseNotClosing           = &Error{Code: 6031, Name: "LeaseNotClosing", Message: "lease is not closing"}
+	ErrChannelNotOpen            = &Error{Code: 6032, Name: "ChannelNotOpen", Message: "channel is not open"}
+	ErrChannelNotClosing         = &Error{Code: 6033, Name: "ChannelNotClosing", Message: "channel is not closing"}
+	ErrVoucherExceedsEscrow      = &Error{Code: 6034, Name: "VoucherExceedsEscrow", Message: "voucher exceeds escrow"}
+	ErrGraceNotElapsed           = &Error{Code: 6035, Name: "GraceNotElapsed", Message: "grace window not elapsed"}
+	ErrRedeemableZero            = &Error{Code: 6036, Name: "RedeemableZero", Message: "redeemable amount is zero"}
+	ErrModeNotVoucher            = &Error{Code: 6037, Name: "ModeNotVoucher", Message: "position mode is not voucher"}
+	ErrModeNotStream             = &Error{Code: 6038, Name: "ModeNotStream", Message: "position mode is not stream"}
+	ErrInvalidVoucherSignature   = &Error{Code: 6039, Name: "InvalidVoucherSignature", Message: "voucher signature is invalid"}
+	ErrBatchLengthMismatch       = &Error{Code: 6040, Name: "BatchLengthMismatch", Message: "batch length mismatch"}
+	ErrBatchNotSorted            = &Error{Code: 6041, Name: "BatchNotSorted", Message: "batch not sorted"}
+	ErrNodeReopened              = &Error{Code: 6042, Name: "NodeReopened", Message: "position belongs to an earlier incarnation of this node"}
+	ErrArithmeticOverflow        = &Error{Code: 6043, Name: "ArithmeticOverflow", Message: "arithmetic overflow"}
+	ErrVaultFrozen               = &Error{Code: 6044, Name: "VaultFrozen", Message: "vault is frozen"}
+	ErrGrantExpired              = &Error{Code: 6045, Name: "GrantExpired", Message: "grant has expired"}
+	ErrPermissionNotGranted      = &Error{Code: 6046, Name: "PermissionNotGranted", Message: "grant does not include the permission for this action"}
+	ErrGrantTargetMismatch       = &Error{Code: 6047, Name: "GrantTargetMismatch", Message: "grant target does not cover this account"}
+	ErrInvalidVoucherSigner      = &Error{Code: 6048, Name: "InvalidVoucherSigner", Message: "voucher signer is not a valid key"}
+	ErrMissingRentRecipient      = &Error{Code: 6049, Name: "MissingRentRecipient", Message: "rent recipient is missing"}
+	ErrInvalidRentRecipient      = &Error{Code: 6050, Name: "InvalidRentRecipient", Message: "rent recipient is neither the signer nor the rent payer"}
+	ErrVoucherClaimExceedsSigned = &Error{Code: 6051, Name: "VoucherClaimExceedsSigned", Message: "voucher claim exceeds the signed amount"}
 )
 
 var errorsByCode = map[uint32]*Error{
@@ -197,4 +198,5 @@ var errorsByCode = map[uint32]*Error{
 	6048: ErrInvalidVoucherSigner,
 	6049: ErrMissingRentRecipient,
 	6050: ErrInvalidRentRecipient,
+	6051: ErrVoucherClaimExceedsSigned,
 }

@@ -1,7 +1,7 @@
 use anchor_lang::{InstructionData, ToAccountMetas};
 use dvpn_core::enums::PositionTerms;
 use dvpn_core::seeds::{find_channel, find_grant, find_lease, find_user};
-use dvpn_core::voucher::Voucher;
+use dvpn_core::voucher::{PartialVoucher, Voucher};
 use solana_sdk::{
     instruction::{AccountMeta, Instruction},
     pubkey::Pubkey,
@@ -184,6 +184,31 @@ pub fn redeem_channel_vouchers_ix_with_accounts(
         program_id: dvpn::ID,
         accounts,
         data: dvpn::instruction::RedeemChannelVouchers { vouchers }.data(),
+    }
+}
+
+pub fn redeem_channel_vouchers_partial_ix(
+    genesis: &Genesis,
+    redeemer: &Pubkey,
+    node: &Pubkey,
+    channels: &[Pubkey],
+    vouchers: Vec<PartialVoucher>,
+) -> Instruction {
+    let mut accounts = dvpn::accounts::RedeemChannelVouchers {
+        signer: *redeemer,
+        config: genesis.config,
+        node: *node,
+    }
+    .to_account_metas(None);
+    accounts.extend(
+        channels
+            .iter()
+            .map(|channel_address| AccountMeta::new(*channel_address, false)),
+    );
+    Instruction {
+        program_id: dvpn::ID,
+        accounts,
+        data: dvpn::instruction::RedeemChannelVouchersPartial { vouchers }.data(),
     }
 }
 
@@ -541,6 +566,31 @@ pub fn redeem_lease_vouchers_ix_with_accounts(
         program_id: dvpn::ID,
         accounts,
         data: dvpn::instruction::RedeemLeaseVouchers { vouchers }.data(),
+    }
+}
+
+pub fn redeem_lease_vouchers_partial_ix(
+    genesis: &Genesis,
+    redeemer: &Pubkey,
+    node: &Pubkey,
+    leases: &[Pubkey],
+    vouchers: Vec<PartialVoucher>,
+) -> Instruction {
+    let mut accounts = dvpn::accounts::RedeemLeaseVouchers {
+        signer: *redeemer,
+        config: genesis.config,
+        node: *node,
+    }
+    .to_account_metas(None);
+    accounts.extend(
+        leases
+            .iter()
+            .map(|lease_address| AccountMeta::new(*lease_address, false)),
+    );
+    Instruction {
+        program_id: dvpn::ID,
+        accounts,
+        data: dvpn::instruction::RedeemLeaseVouchersPartial { vouchers }.data(),
     }
 }
 

@@ -184,6 +184,8 @@ func TestHandler_GetChannel_PreservesConcurrentVoucherAndRedemption(t *testing.T
 			Signature:  signed.Signature[:],
 		})
 		require.NoError(t, err)
+		require.NoError(t, home.DB.Model(&node.Position{}).Where("address = ?", address.String()).
+			Update("settled", 200).Error)
 		require.NoError(t, node.Redeem(t.Context(), r))
 	}))
 	response, err := node.NewHandler(r).GetChannel(

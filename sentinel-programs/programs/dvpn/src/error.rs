@@ -104,4 +104,6 @@ pub enum DvpnError {
     MissingRentRecipient,
     #[msg("rent recipient is neither the signer nor the rent payer")]
     InvalidRentRecipient,
+    #[msg("voucher claim exceeds the signed amount")]
+    VoucherClaimExceedsSigned,
 }

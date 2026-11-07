@@ -1,8 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::indexing_slicing)]
 use dvpn::error::DvpnError;
 use dvpn_core::enums::{ListingStatus, PositionMode, PositionStatus, PositionTerms};
-use dvpn_core::seeds::{find_channel, find_lease};
-use dvpn_core::voucher::{CHANNEL_VOUCHER_DOMAIN, LEASE_VOUCHER_DOMAIN, Voucher};
+use dvpn_core::seeds::{find_channel, find_lease, find_user};
+use dvpn_core::voucher::{CHANNEL_VOUCHER_DOMAIN, LEASE_VOUCHER_DOMAIN, PartialVoucher, Voucher};
 use solana_sdk::hash::hash;
 use solana_sdk::{instruction::Instruction, pubkey::Pubkey, signature::Keypair, signer::Signer};
 
@@ -573,5 +573,254 @@ fn open_with_small_order_voucher_signer_fails() {
             dvpn_test_support::read_token_amount(&genesis.svm, &owner_token),
             1_000_000
         );
+    }
+}
+
+// ─── Partial redemption: the node claims only what it served ───
+
+fn partial_redeem_ix(
+    genesis: &dvpn_test_support::Genesis,
+    kind: PositionKind,
+    redeemer: &Pubkey,
+    node: &Pubkey,
+    positions: &[Pubkey],
+    vouchers: Vec<PartialVoucher>,
+) -> Instruction {
+    match kind {
+        PositionKind::Channel => {
+            dvpn_test_support::ix_positions::redeem_channel_vouchers_partial_ix(
+                genesis, redeemer, node, positions, vouchers,
+            )
+        }
+        PositionKind::Lease => dvpn_test_support::ix_positions::redeem_lease_vouchers_partial_ix(
+            genesis, redeemer, node, positions, vouchers,
+        ),
+    }
+}
+
+fn read_redeemed(genesis: &dvpn_test_support::Genesis, kind: PositionKind, position: &Pubkey) -> u64 {
+    match kind {
+        PositionKind::Channel => dvpn_test_support::read_channel(&genesis.svm, position).redeemed,
+        PositionKind::Lease => dvpn_test_support::read_lease(&genesis.svm, position).redeemed,
+    }
+}
+
+fn funded_redeemer(genesis: &mut dvpn_test_support::Genesis) -> Keypair {
+    let redeemer = Keypair::new();
+    genesis
+        .svm
+        .airdrop(&redeemer.pubkey(), 10_000_000_000)
+        .unwrap();
+    redeemer
+}
+
+/// The client signed 1,000 ahead and the node served 11. A partial claim of 11 leaves 989 in
+/// the escrow, and close returns it to the client. Redeeming the whole voucher returns nothing.
+#[test]
+fn partial_channel_redeem_refunds_the_unused_lead_at_close() {
+    for (claim, refund) in [(11u64, 989u64), (1_000, 0)] {
+        let mut genesis = dvpn_test_support::genesis();
+        {
+            let mut config_state = dvpn_test_support::read_config(&genesis.svm);
+            config_state.channel_close_grace_seconds = 300;
+            dvpn_test_support::plant_account(&mut genesis.svm, genesis.config, &config_state);
+        }
+        let node = plant_listed_node(&mut genesis);
+        let owner = Keypair::new();
+        genesis
+            .svm
+            .airdrop(&owner.pubkey(), 10_000_000_000)
+            .unwrap();
+        dvpn_test_support::plant_user(
+            &mut genesis.svm,
+            genesis.config,
+            &dvpn_test_support::UserSpec {
+                owner: owner.pubkey(),
+                balance: 0,
+                open_channels: 1,
+            },
+        );
+        let voucher_signer_key = dvpn_test_support::voucher_signing_key(60);
+        let voucher_signer = Pubkey::new_from_array(voucher_signer_key.verifying_key().to_bytes());
+        let channel = dvpn_test_support::plant_channel(
+            &mut genesis.svm,
+            genesis.config,
+            &dvpn_test_support::ChannelSpec {
+                owner: owner.pubkey(),
+                channel_id: [61u8; 32],
+                node,
+                opener: owner.pubkey(),
+                voucher_signer,
+                mode: PositionMode::Voucher as u8,
+                status: PositionStatus::Open as u8,
+                escrow: 1_000,
+                rent_recipient: owner.pubkey(),
+                ..Default::default()
+            },
+        );
+        let signature =
+            dvpn_test_support::sign_channel_voucher(&voucher_signer_key, &channel, 0, 1_000);
+
+        let redeemer = funded_redeemer(&mut genesis);
+        let redeem = dvpn_test_support::ix_positions::redeem_channel_vouchers_partial_ix(
+            &genesis,
+            &redeemer.pubkey(),
+            &node,
+            &[channel],
+            vec![PartialVoucher {
+                cumulative_amount: 1_000,
+                signature,
+                amount: claim,
+            }],
+        );
+        dvpn_test_support::send_expect_ok(&mut genesis.svm, &[redeem], &[&redeemer]);
+        assert_eq!(dvpn_test_support::read_channel(&genesis.svm, &channel).redeemed, claim);
+        let node_state = dvpn_test_support::read_node(&genesis.svm, &node);
+        assert_eq!(node_state.revenue + node_state.fees_accrued, claim);
+
+        dvpn_test_support::set_clock(&mut genesis.svm, 10_000);
+        let start = dvpn_test_support::ix_positions::start_close_channel_ix(
+            &genesis,
+            &channel,
+            &owner.pubkey(),
+        );
+        dvpn_test_support::send_expect_ok(&mut genesis.svm, &[start], &[&owner]);
+        dvpn_test_support::set_clock(&mut genesis.svm, 10_300);
+        let close = dvpn_test_support::ix_positions::close_channel_ix(
+            &genesis,
+            &channel,
+            &owner.pubkey(),
+            None,
+            &owner.pubkey(),
+        );
+        dvpn_test_support::send_expect_ok(&mut genesis.svm, &[close], &[&owner]);
+        assert_eq!(
+            dvpn_test_support::read_user(&genesis.svm, &find_user(&dvpn::ID, &owner.pubkey()).0)
+                .balance,
+            refund
+        );
+        dvpn_test_support::assert_solvent(&genesis.svm, 0);
+    }
+}
+
+#[test]
+fn partial_redeem_claim_above_the_signed_amount_fails() {
+    for kind in [PositionKind::Channel, PositionKind::Lease] {
+        let mut genesis = dvpn_test_support::genesis();
+        let node = plant_listed_node(&mut genesis);
+        let voucher_signer_key = dvpn_test_support::voucher_signing_key(62);
+        let voucher_signer = Pubkey::new_from_array(voucher_signer_key.verifying_key().to_bytes());
+        let position = plant_position(
+            &mut genesis,
+            kind,
+            &node,
+            [63u8; 32],
+            Pubkey::new_unique(),
+            voucher_signer,
+            voucher_signer,
+            1_000_000,
+        );
+        let signature = kind.sign(&voucher_signer_key, &position, 0, 500);
+        let redeemer = funded_redeemer(&mut genesis);
+        let instruction = partial_redeem_ix(
+            &genesis,
+            kind,
+            &redeemer.pubkey(),
+            &node,
+            &[position],
+            vec![PartialVoucher {
+                cumulative_amount: 500,
+                signature,
+                amount: 501,
+            }],
+        );
+        let failed =
+            dvpn_test_support::send_expect_err(&mut genesis.svm, &[instruction], &[&redeemer]);
+        dvpn_test_support::assert_dvpn_error(&failed, DvpnError::VoucherClaimExceedsSigned);
+        assert_eq!(read_redeemed(&genesis, kind, &position), 0);
+        dvpn_test_support::assert_solvent(&genesis.svm, 0);
+    }
+}
+
+/// A claim can grow on the same voucher as the node serves more, never shrink, and a
+/// whole-voucher redeem still takes the rest.
+#[test]
+fn partial_redeem_claims_grow_on_the_same_voucher() {
+    for kind in [PositionKind::Channel, PositionKind::Lease] {
+        let mut genesis = dvpn_test_support::genesis();
+        let node = plant_listed_node(&mut genesis);
+        let voucher_signer_key = dvpn_test_support::voucher_signing_key(64);
+        let voucher_signer = Pubkey::new_from_array(voucher_signer_key.verifying_key().to_bytes());
+        let position = plant_position(
+            &mut genesis,
+            kind,
+            &node,
+            [65u8; 32],
+            Pubkey::new_unique(),
+            voucher_signer,
+            voucher_signer,
+            1_000_000,
+        );
+        let signature = kind.sign(&voucher_signer_key, &position, 0, 500);
+        let partial = |amount| PartialVoucher {
+            cumulative_amount: 500,
+            signature,
+            amount,
+        };
+        let redeemer = funded_redeemer(&mut genesis);
+
+        let first = partial_redeem_ix(
+            &genesis,
+            kind,
+            &redeemer.pubkey(),
+            &node,
+            &[position],
+            vec![partial(100)],
+        );
+        dvpn_test_support::send_expect_ok(&mut genesis.svm, &[first], &[&redeemer]);
+        assert_eq!(read_redeemed(&genesis, kind, &position), 100);
+
+        genesis.svm.expire_blockhash();
+        let same = partial_redeem_ix(
+            &genesis,
+            kind,
+            &redeemer.pubkey(),
+            &node,
+            &[position],
+            vec![partial(100)],
+        );
+        let failed = dvpn_test_support::send_expect_err(&mut genesis.svm, &[same], &[&redeemer]);
+        dvpn_test_support::assert_dvpn_error(&failed, DvpnError::RedeemableZero);
+        assert_eq!(read_redeemed(&genesis, kind, &position), 100);
+
+        genesis.svm.expire_blockhash();
+        let higher = partial_redeem_ix(
+            &genesis,
+            kind,
+            &redeemer.pubkey(),
+            &node,
+            &[position],
+            vec![partial(250)],
+        );
+        dvpn_test_support::send_expect_ok(&mut genesis.svm, &[higher], &[&redeemer]);
+        assert_eq!(read_redeemed(&genesis, kind, &position), 250);
+
+        genesis.svm.expire_blockhash();
+        let whole = redeem_ix(
+            &genesis,
+            kind,
+            &redeemer.pubkey(),
+            &node,
+            &[position],
+            vec![Voucher {
+                cumulative_amount: 500,
+                signature,
+            }],
+        );
+        dvpn_test_support::send_expect_ok(&mut genesis.svm, &[whole], &[&redeemer]);
+        assert_eq!(read_redeemed(&genesis, kind, &position), 500);
+        let node_state = dvpn_test_support::read_node(&genesis.svm, &node);
+        assert_eq!(node_state.revenue + node_state.fees_accrued, 500);
+        dvpn_test_support::assert_solvent(&genesis.svm, 0);
     }
 }

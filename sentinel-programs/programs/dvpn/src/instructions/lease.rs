@@ -6,7 +6,7 @@ use dvpn_core::permissions::{
     PERM_CLOSE_LEASE, PERM_FUND_LEASES, PERM_OPEN_LEASE, PERM_START_CLOSE_LEASE,
 };
 use dvpn_core::seeds::{CONFIG_SEED, GRANT_SEED, LEASE_SEED, NODE_SEED, PROVIDER_SEED};
-use dvpn_core::voucher::{Voucher, lease_voucher_message};
+use dvpn_core::voucher::{PartialVoucher, Voucher, lease_voucher_message};
 
 use crate::error::DvpnError;
 use crate::state::{Config, Grant, Lease, Node, Provider};
@@ -344,6 +344,21 @@ pub fn redeem_lease_vouchers(
     ctx: Context<RedeemLeaseVouchers>,
     vouchers: Vec<Voucher>,
 ) -> Result<()> {
+    redeem_lease_claims(ctx, vouchers.into_iter().map(PartialVoucher::from).collect())
+}
+
+/// Like `redeem_lease_vouchers`, but each voucher claims only `amount` of its signed total.
+pub fn redeem_lease_vouchers_partial(
+    ctx: Context<RedeemLeaseVouchers>,
+    vouchers: Vec<PartialVoucher>,
+) -> Result<()> {
+    redeem_lease_claims(ctx, vouchers)
+}
+
+fn redeem_lease_claims(
+    ctx: Context<RedeemLeaseVouchers>,
+    vouchers: Vec<PartialVoucher>,
+) -> Result<()> {
     let fee_bps = ctx.accounts.config.fee_bps;
     let remaining = ctx.remaining_accounts;
     batch::require_sorted_unique(remaining)?;
@@ -371,11 +386,15 @@ pub fn redeem_lease_vouchers(
             voucher.cumulative_amount <= lease.escrow,
             DvpnError::VoucherExceedsEscrow
         );
-        if voucher.cumulative_amount <= lease.redeemed {
+        require!(
+            voucher.amount <= voucher.cumulative_amount,
+            DvpnError::VoucherClaimExceedsSigned
+        );
+        if voucher.amount <= lease.redeemed {
             continue;
         }
         let gross_amount = voucher
-            .cumulative_amount
+            .amount
             .checked_sub(lease.redeemed)
             .ok_or_else(|| error!(DvpnError::ArithmeticOverflow))?;
         let fee = fee::fee_amount(gross_amount, fee_bps)?;
@@ -391,7 +410,7 @@ pub fn redeem_lease_vouchers(
             .fees_accrued
             .checked_add(fee)
             .ok_or_else(|| error!(DvpnError::ArithmeticOverflow))?;
-        lease.redeemed = voucher.cumulative_amount;
+        lease.redeemed = voucher.amount;
         redeemed_any = true;
         emit!(events::LeaseVoucherRedeemed {
             lease: lease.key(),
