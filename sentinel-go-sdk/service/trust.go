@@ -187,12 +187,14 @@ func trustedDir(dir string) bool {
 	return true
 }
 
-// searchDirs lists where a bare tool name is looked up, in order: PATH, the platform's usual
-// install folders, then the folders protocol drivers register. Relative PATH entries are skipped.
-func searchDirs(goos string) []string {
+// knownDirs is knownBinaryDirs; tests replace it to point the fallback at their own folders.
+var knownDirs = knownBinaryDirs
+
+// uniqueAbsDirs joins folder lists in order, dropping empty, relative and repeated entries.
+func uniqueAbsDirs(lists ...[]string) []string {
 	var dirs []string
 
-	for _, dir := range slices.Concat(filepath.SplitList(os.Getenv("PATH")), knownBinaryDirs(goos), registeredDirs()) {
+	for _, dir := range slices.Concat(lists...) {
 		if dir == "" || !filepath.IsAbs(dir) || slices.Contains(dirs, dir) {
 			continue
 		}
@@ -203,9 +205,21 @@ func searchDirs(goos string) []string {
 	return dirs
 }
 
-// trustedPathEnv is the PATH a started tool gets: only the folders of searchDirs that pass the
-// rule, so a script such as wg-quick cannot reach a replaceable helper by name.
+// searchDirs lists where a bare tool name is looked up, in order: PATH, the platform's usual
+// install folders, then the folders protocol drivers register. Relative PATH entries are skipped.
+// Every candidate found in any of them must still pass the rule (see LookPath).
+func searchDirs(goos string) []string {
+	return uniqueAbsDirs(filepath.SplitList(os.Getenv("PATH")), knownDirs(goos), registeredDirs())
+}
+
+// trustedPathEnv is the PATH a started tool gets: only folders that pass the rule, so a script
+// such as wg-quick cannot reach a replaceable helper by name. The tool folders (registered by
+// drivers, then the platform's usual install folders) come before the process PATH, so a script's
+// helpers come from where its tools live: on macOS, `#!/usr/bin/env bash` in wg-quick must find a
+// bash 4+ installed with the tools rather than the system bash 3.2 in /bin.
 func trustedPathEnv(goos string) string {
-	return strings.Join(slices.DeleteFunc(searchDirs(goos), func(dir string) bool { return !trustedDir(dir) }),
+	dirs := uniqueAbsDirs(registeredDirs(), knownDirs(goos), filepath.SplitList(os.Getenv("PATH")))
+
+	return strings.Join(slices.DeleteFunc(dirs, func(dir string) bool { return !trustedDir(dir) }),
 		string(os.PathListSeparator))
 }

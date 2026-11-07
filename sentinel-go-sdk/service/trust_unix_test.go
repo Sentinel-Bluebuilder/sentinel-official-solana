@@ -126,6 +126,28 @@ func TestRun_ChildPathHoldsOnlyTrustedDirs(t *testing.T) {
 	require.Contains(t, dirs, "/usr/bin")
 }
 
+// useKnownDirs points the platform fallback folders at dirs for one test.
+func useKnownDirs(t *testing.T, dirs ...string) {
+	t.Helper()
+
+	real := knownDirs
+	knownDirs = func(string) []string { return dirs }
+
+	t.Cleanup(func() { knownDirs = real })
+}
+
+func TestRun_ChildPathPutsToolDirsFirst(t *testing.T) {
+	tools := t.TempDir()
+	bash := writeTool(t, tools, "bash", 0o755)
+
+	useKnownDirs(t, tools)
+	t.Setenv("PATH", "/usr/bin"+string(os.PathListSeparator)+"/bin")
+
+	out, err := Run(context.Background(), Command{Path: "sh", Args: []string{"-c", `command -v bash`}})
+	require.NoError(t, err)
+	require.Equal(t, bash, strings.TrimSpace(string(out)))
+}
+
 func TestCommandContext_UnresolvedToolDoesNotStart(t *testing.T) {
 	planted := openDir(t, 0o777)
 	writeTool(t, planted, "trust-probe", 0o755)
