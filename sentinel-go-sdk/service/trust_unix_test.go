@@ -136,6 +136,32 @@ func useKnownDirs(t *testing.T, dirs ...string) {
 	t.Cleanup(func() { knownDirs = real })
 }
 
+func TestLookPath_FallbackSkipsUntrustedKnownDir(t *testing.T) {
+	planted := openDir(t, 0o777)
+	writeTool(t, planted, "trust-probe", 0o755)
+
+	// The tool is missing from PATH, so only the fallback folders can supply it.
+	t.Setenv("PATH", t.TempDir())
+
+	useKnownDirs(t, planted)
+
+	_, err := LookPath("trust-probe")
+	require.ErrorIs(t, err, ErrUntrustedBinary)
+	require.ErrorContains(t, err, planted)
+
+	safe := t.TempDir()
+	want := writeTool(t, safe, "trust-probe", 0o755)
+
+	useKnownDirs(t, planted, safe)
+
+	got, err := LookPath("trust-probe")
+	require.NoError(t, err)
+	require.Equal(t, want, got)
+
+	cmd := CommandContext(context.Background(), "trust-probe")
+	require.Equal(t, want, cmd.Path)
+}
+
 func TestRun_ChildPathPutsToolDirsFirst(t *testing.T) {
 	tools := t.TempDir()
 	bash := writeTool(t, tools, "bash", 0o755)
