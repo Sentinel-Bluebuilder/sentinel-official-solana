@@ -3,7 +3,10 @@ package tests
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -294,8 +297,9 @@ func TestCommands_SearchNode(t *testing.T) {
 		t.Fatalf("out = %#v", r.out)
 	}
 
-	if n := len(dvpn.Commands(r)); n != 47+2*11 {
-		t.Fatalf("commands = %d", n)
+	// One command per instruction, plus show- and search- per account type, as the IDL lists them.
+	if n, want := len(dvpn.Commands(r)), idlCommandCount(t); n != want {
+		t.Fatalf("commands = %d, want %d", n, want)
 	}
 }
 
@@ -338,4 +342,25 @@ func requireSameInstruction(t *testing.T, got, want solana.Instruction) {
 	if !bytes.Equal(gotData, wantData) {
 		t.Fatalf("data: got %x, want %x", gotData, wantData)
 	}
+}
+
+// idlCommandCount is how many commands the generated CLI should hold for the dvpn IDL.
+func idlCommandCount(t *testing.T) int {
+	t.Helper()
+
+	data, err := os.ReadFile(filepath.Join("..", "..", "..", "idl", "dvpn.json"))
+	if err != nil {
+		t.Fatalf("reading the dvpn IDL: %v", err)
+	}
+
+	var idl struct {
+		Accounts     []json.RawMessage `json:"accounts"`
+		Instructions []json.RawMessage `json:"instructions"`
+	}
+
+	if err := json.Unmarshal(data, &idl); err != nil {
+		t.Fatalf("decoding the dvpn IDL: %v", err)
+	}
+
+	return len(idl.Instructions) + 2*len(idl.Accounts)
 }
