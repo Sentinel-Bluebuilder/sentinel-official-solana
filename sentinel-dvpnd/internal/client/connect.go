@@ -642,6 +642,8 @@ func (r *Runtime) startTunnel(
 		return nil, allowlist{}, err
 	}
 
+	setTunnelIPv6(conn.service, r.cfg.Network.KillSwitch, hosts.addrs)
+
 	if err := r.startService(lifecycle, conn, endpoint.String(), opened.Peer); err != nil {
 		return nil, allowlist{}, err
 	}
