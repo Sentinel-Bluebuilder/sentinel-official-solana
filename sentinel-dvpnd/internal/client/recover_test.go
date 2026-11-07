@@ -353,3 +353,27 @@ func TestRuntime_StartSession_IncompleteFirewallRowFails(t *testing.T) {
 	require.ErrorIs(t, err, client.ErrFirewallRowIncomplete)
 	require.Empty(t, firewall.applies())
 }
+
+func TestRuntime_Recover_StaleServiceCleanupFailureIsNotFatal(t *testing.T) {
+	t.Parallel()
+
+	fakeRPC := sdktest.NewFakeRPC(t)
+	home := testutil.NewClientHome(t, fakeRPC)
+	rt := newRuntime(t, home, home.ProgramClient)
+	client.SetInterfaceRemover(rt, &testutil.RecordingInterfaceRemover{})
+	client.SetDNSBackend(rt, &recordingDNSBackend{})
+	client.SetFirewallBackend(rt, &recordingFirewallBackend{})
+	registerFakeClientOnce()
+
+	// One service's stale-leftover cleanup fails, as a non-root run hits when an old artifact is
+	// root-owned ("permission denied"). The daemon must still finish recovery and start.
+	boom := func() error { return errors.New("permission denied") }
+	client.SetService(rt, sdktest.FakeName, fakeClientConfig{
+		hooks: clientHooks{onCleanupError: &boom},
+		state: sdktest.NewFakeState(sdktest.FakeName),
+	})
+
+	require.NoError(t, rt.Recover(t.Context()),
+		"a stale service's cleanup failure must not abort daemon start")
+	require.True(t, client.Recovered(rt))
+}

@@ -107,17 +107,23 @@ func (r *Runtime) clearLeftovers(ctx context.Context) error {
 	names := slices.Concat(first, rest)
 	dirs := make([]string, 0, len(names))
 
-	var result error
-
 	for _, name := range names {
 		dirs = append(dirs, r.placement(name).ToolDir)
 
+		// A stale service's leftovers are old artifacts of a previous run, not a live leak, so a
+		// failure to clear one (e.g. permission denied on a non-root run) must not abort daemon
+		// start. Log it and move on; the live interface, firewall and DNS cleanups stay fatal.
 		if err := r.clearServiceLeftovers(ctx, name); err != nil {
-			result = errors.Join(result, fmt.Errorf("clearing %s leftovers: %w", name, err))
+			r.log.Error().Err(err).Str("service", string(name)).
+				Msg("clearing a stale service's leftovers; continuing daemon start")
 		}
 	}
 
-	return errors.Join(result, leftover.RemoveCopies(dirs, r.iface))
+	if err := leftover.RemoveCopies(dirs, r.iface); err != nil {
+		r.log.Error().Err(err).Msg("removing leftover tool-dir copies; continuing daemon start")
+	}
+
+	return nil
 }
 
 func (r *Runtime) clearServiceLeftovers(ctx context.Context, name service.Name) error {
