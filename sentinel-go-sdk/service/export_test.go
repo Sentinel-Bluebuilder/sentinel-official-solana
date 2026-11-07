@@ -52,3 +52,7 @@ func SetReadProcessArgs(read ReadProcessArgsFunc) ReadProcessArgsFunc {
 
 	return previous
 }
+
+func WritePIDRecord(path string, pid int, executable string) error {
+	return writePIDRecord(path, pid, executable)
+}
