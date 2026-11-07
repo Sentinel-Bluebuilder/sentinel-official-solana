@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/solana-foundation/solana-go/v2"
@@ -227,7 +228,7 @@ func (r *Runtime) reconnect(
 		return nil, false
 	}
 
-	placeholder := &connection{cancel: conn.cancel}
+	placeholder := &connection{cancel: conn.cancel, replaces: append(slices.Clone(conn.replaces), conn.session.ID)}
 	r.connection = placeholder
 	r.publishLocked()
 

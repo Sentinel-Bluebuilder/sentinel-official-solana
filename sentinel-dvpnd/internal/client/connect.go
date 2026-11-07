@@ -142,6 +142,7 @@ func (r *Runtime) connect(
 	terms := r.terms(node)
 	conn := &connection{
 		cancel:     placeholder.cancel,
+		replaces:   placeholder.replaces,
 		heartbeat:  max(time.Second, time.Duration(dial.metadata.Settlement.HeartbeatSeconds)*time.Second),
 		nodeClient: dial.client,
 		session: Session{

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"sync"
 	"time"
 
@@ -52,6 +53,7 @@ type connection struct {
 	payer                   *session.Payer
 	pollFailingSinceUnix    int64
 	remoteClosed            bool
+	replaces                []string
 	service                 service.Client
 	session                 Session
 	statsFailures           uint
@@ -357,7 +359,7 @@ func (r *Runtime) takeConnection(reason, id string) (*connection, turn, error) {
 	}
 
 	conn := r.connection
-	if id != "" && conn != nil && conn.session.ID != id {
+	if id != "" && conn != nil && conn.session.ID != id && !slices.Contains(conn.replaces, id) {
 		return nil, turn{}, errMissingSession
 	}
 
@@ -466,4 +468,25 @@ func (r *Runtime) watch(sessionID string) (*watcher, *Session) {
 	copied := *s
 
 	return w, &copied
+}
+
+// liveSession returns the current session when id is its own, or the id of a session it replaced in an
+// automatic reconnect (connection.replaces, oldest first): the caller keeps the id it started, so that id reads
+// the live session (its own id) instead of the ended row, and StopSession accepts it too (takeConnection).
+func (r *Runtime) liveSession(id string) (*Session, bool) {
+	s, ok := r.current()
+	if !ok {
+		return nil, false
+	}
+
+	if s.ID == id {
+		return s, true
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	conn := r.connection
+
+	return s, conn != nil && conn.session.ID == s.ID && slices.Contains(conn.replaces, id)
 }
