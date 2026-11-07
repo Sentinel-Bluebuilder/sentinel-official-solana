@@ -71,7 +71,7 @@ const (
 )
 
 // startWithRoute starts a client whose fake openvpn adds the server host route, as redirect-gateway does.
-func startWithRoute(t *testing.T, table *routeTable, p service.Placement) *openvpn.Client {
+func startWithRoute(t *testing.T, table *routeTable, p service.Placement, proc service.Process) *openvpn.Client {
 	t.Helper()
 
 	listener, _ := startClientManagement(t, "CONNECTED,SUCCESS", nil)
@@ -82,7 +82,7 @@ func startWithRoute(t *testing.T, table *routeTable, p service.Placement) *openv
 		service.WithProcessStarter(func(context.Context, service.Command, zerolog.Logger) (service.Process, error) {
 			table.set(routeServer, routeLine)
 
-			return failingStopProcess{}, nil
+			return proc, nil
 		}),
 	)
 	openvpn.SetHostRouteRunner(client, "linux", table.run)
@@ -97,7 +97,7 @@ func TestClient_Cleanup_RemovesTheHostRouteAKilledOpenVPNLeft(t *testing.T) {
 
 	table := &routeTable{routes: map[string]string{}}
 	p := service.Placement{Dir: t.TempDir(), Interface: "dvpn-c0", ToolDir: t.TempDir()}
-	startWithRoute(t, table, p)
+	startWithRoute(t, table, p, failingStopProcess{})
 	require.Equal(t, routeLine, table.get(routeServer))
 
 	restarted := openvpn.NewClientForTest(openvpn.DefaultClientConfig(), p, zerolog.Nop())
@@ -107,12 +107,42 @@ func TestClient_Cleanup_RemovesTheHostRouteAKilledOpenVPNLeft(t *testing.T) {
 	require.Empty(t, table.get(routeServer), "the host route openvpn added is gone after Cleanup")
 }
 
+// killedProcess is an openvpn that was SIGKILLed: it has exited, and it never removed its route.
+type killedProcess struct{ done chan struct{} }
+
+func newKilledProcess() killedProcess {
+	done := make(chan struct{})
+	close(done)
+
+	return killedProcess{done: done}
+}
+
+func (p killedProcess) Done() <-chan struct{}    { return p.done }
+func (killedProcess) Err() error                 { return nil }
+func (killedProcess) PID() int                   { return 4242 }
+func (killedProcess) Stop(context.Context) error { return nil }
+func (killedProcess) Wait(context.Context) error { return nil }
+
+// The openvpn process is killed during the session, and the client then stops the session in the same daemon.
+func TestClient_Stop_RemovesTheHostRouteAKilledOpenVPNLeft(t *testing.T) {
+	t.Parallel()
+
+	table := &routeTable{routes: map[string]string{}}
+	p := service.Placement{Dir: t.TempDir(), Interface: "dvpn-c0", ToolDir: t.TempDir()}
+	client := startWithRoute(t, table, p, newKilledProcess())
+	require.Equal(t, routeLine, table.get(routeServer))
+
+	require.NoError(t, client.Stop(t.Context()))
+
+	require.Empty(t, table.get(routeServer), "the host route openvpn added is gone after Stop")
+}
+
 func TestClient_Cleanup_KeepsAHostRouteThatChanged(t *testing.T) {
 	t.Parallel()
 
 	table := &routeTable{routes: map[string]string{}}
 	p := service.Placement{Dir: t.TempDir(), Interface: "dvpn-c0", ToolDir: t.TempDir()}
-	startWithRoute(t, table, p)
+	startWithRoute(t, table, p, failingStopProcess{})
 
 	other := "203.0.113.1 via 192.0.2.254 dev eth1"
 	table.set(routeServer, other) // someone else owns the route now
@@ -130,7 +160,7 @@ func TestClient_Start_DoesNotRecordAHostRouteThatWasThereBefore(t *testing.T) {
 
 	table := &routeTable{routes: map[string]string{routeServer: routeLine}} // the user's own route
 	p := service.Placement{Dir: t.TempDir(), Interface: "dvpn-c0", ToolDir: t.TempDir()}
-	startWithRoute(t, table, p)
+	startWithRoute(t, table, p, failingStopProcess{})
 
 	restarted := openvpn.NewClientForTest(openvpn.DefaultClientConfig(), p, zerolog.Nop())
 	openvpn.SetHostRouteRunner(restarted, "linux", table.run)
