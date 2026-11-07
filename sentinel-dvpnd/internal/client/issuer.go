@@ -102,7 +102,12 @@ func (r *Runtime) issueLoop(ctx context.Context, conn *connection) (string, bool
 			if !polling {
 				polling = true
 
-				go r.fetchSession(streamCtx, conn.nodeClient, conn.session.ID, polled)
+				// Read the client under issueMu, where it is written; the goroutine then works on its own copy.
+				conn.issueMu.Lock()
+				nodeClient, sessionID := conn.nodeClient, conn.session.ID
+				conn.issueMu.Unlock()
+
+				go r.fetchSession(streamCtx, nodeClient, sessionID, polled)
 			}
 
 			continue
