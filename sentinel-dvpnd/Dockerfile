@@ -6,6 +6,8 @@ ARG SENTINEL_MINT=
 
 WORKDIR /root
 
+# If this hangs, the host MTU is likely below 1500 (common on cloud VMs and behind a VPN);
+# build with a matching network MTU. See the README, "Docker images".
 RUN apk add --no-cache \
     autoconf \
     automake \
@@ -98,6 +100,8 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 FROM alpine:3.24
 
+# If this hangs, the host MTU is likely below 1500 (common on cloud VMs and behind a VPN);
+# build with a matching network MTU. See the README, "Docker images".
 RUN apk add --no-cache \
     bash \
     iproute2 \

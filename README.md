@@ -41,6 +41,30 @@ anchor build   # also copies the IDLs to idl/ and regenerates the Go client
 cargo test
 ```
 
+### Docker images
+
+`sentinel-dvpn` and `sentinel-dvpnd` each ship a `Dockerfile`. On a host whose primary
+interface MTU is below 1500 — most cloud VMs (Google Cloud and others default to 1460), and
+any host behind a VPN or an overlay network — `docker build` can hang on the `apk add` step.
+Docker's default bridge network is MTU 1500, so the TLS fetch to the Alpine mirror sends
+full-size packets the smaller uplink drops; when the path also filters ICMP "fragmentation
+needed" (common on cloud networks) the sender never learns to shrink them and the download
+stalls until it times out. Check the uplink's MTU with `ip -o link show` (the `mtu NNNN` on,
+e.g., `eth0`).
+
+Build with a network MTU that matches the host so the fetch fits:
+
+```sh
+# one-off: build on the host network, which already has the correct MTU
+docker build --network=host -f sentinel-dvpnd/Dockerfile -t sentinel-dvpnd .
+
+# or set the default-bridge MTU once in /etc/docker/daemon.json, then restart docker:
+#   { "mtu": 1460 }
+
+# with buildx, create a builder that uses the host network:
+#   docker buildx create --name lowmtu --driver-opt network=host --use
+```
+
 ## License
 
 See [LICENSE](LICENSE). Third-party software is credited in

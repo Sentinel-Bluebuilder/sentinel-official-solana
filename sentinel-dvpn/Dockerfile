@@ -6,6 +6,8 @@ ARG SENTINEL_MINT=
 
 WORKDIR /src
 
+# If this hangs, the host MTU is likely below 1500 (common on cloud VMs and behind a VPN);
+# build with a matching network MTU. See the README, "Docker images".
 RUN apk add --no-cache bash git make
 
 COPY . /src
