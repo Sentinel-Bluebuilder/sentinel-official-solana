@@ -107,3 +107,38 @@ func TestRemoveRouteRules_IPv6LeftoversToo(t *testing.T) { //nolint:paralleltest
 		"-6 rule del pref 9003 from all lookup 1818566472",
 	}, deleted, "all four sing-tun IPv6 rules; a foreign goto outside its range stays")
 }
+
+// After a daemon SIGKILL during a session, sing-tun's DNS bypass rule (IPv4 at 9002, IPv6 at 9001) was left
+// too; it names neither the table nor the tun. The same rule outside sing-tun's range belongs to someone else.
+func TestRemoveRouteRules_DNSBypassRuleToo(t *testing.T) { //nolint:paralleltest // swaps ipRule
+	const bypass = "not from all dport 53 lookup main suppress_prefixlength 0"
+
+	v4 := strings.Replace(leftRulesV4, "9003:\tnot from all iif lo", "9002:\t"+bypass+"\n9003:\tnot from all iif lo", 1)
+	v4 = strings.Replace(v4, "32764:", "31000:\t"+bypass+"\n32764:", 1)
+	v6 := strings.Replace(leftRulesV6, "9002:\tfrom ::/1", "9001:\t"+bypass+"\n9002:\tfrom ::/1", 1)
+
+	var deleted []string
+
+	orig := ipRule
+	t.Cleanup(func() { ipRule = orig })
+
+	ipRule = func(_ context.Context, args ...string) ([]byte, error) {
+		if args[2] == "show" {
+			if args[0] == "-4" {
+				return []byte(v4), nil
+			}
+
+			return []byte(v6), nil
+		}
+
+		deleted = append(deleted, strings.Join(args, " "))
+
+		return nil, nil
+	}
+
+	require.NoError(t, removeRouteRules(t.Context(), "dvpn-hy2-client"))
+	require.Contains(t, deleted, "-4 rule del pref 9002 "+bypass)
+	require.Contains(t, deleted, "-6 rule del pref 9001 "+bypass)
+	require.NotContains(t, deleted, "-4 rule del pref 31000 "+bypass, "a bypass rule outside sing-tun's range stays")
+	require.Len(t, deleted, 6+1+4+1)
+}

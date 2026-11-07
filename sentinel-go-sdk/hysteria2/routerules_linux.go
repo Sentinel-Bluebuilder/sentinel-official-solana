@@ -27,6 +27,11 @@ var ipRule = func(ctx context.Context, args ...string) ([]byte, error) {
 	return exec.CommandContext(ctx, "ip", args...).CombinedOutput() //#nosec G204 -- fixed binary, parsed args
 }
 
+// dnsBypassSelector is the rule sing-tun adds next to its table rules so that only DNS is forced into the
+// tun: every other packet may use a main-table route more specific than the default. It names neither the
+// table nor the tun, so it is matched by its exact selector inside the pref range of this tunnel's rules.
+var dnsBypassSelector = []string{"not", "from", "all", "dport", "53", "lookup", "main", "suppress_prefixlength", "0"}
+
 type ipRuleLine struct {
 	pref     string
 	selector []string
@@ -97,6 +102,8 @@ func staleTunRules(rules []ipRuleLine, prefix, iface string) []ipRuleLine {
 
 		switch {
 		case table != "" && ruleValue(r.selector, "lookup") == table:
+			stale = append(stale, r)
+		case table != "" && p >= low && p <= high && slices.Equal(r.selector, dnsBypassSelector):
 			stale = append(stale, r)
 		case iface != "" && ruleValue(r.selector, "iif") == iface, goTo != "" && p >= low && p <= high:
 			stale = append(stale, r)
