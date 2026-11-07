@@ -9,6 +9,7 @@ import (
 	"net"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/jellydator/ttlcache/v3"
@@ -90,6 +91,9 @@ type Runtime struct {
 	signerLimiter   *api.Limiter
 	speed           nodeapi.Bandwidth
 	voucherRequests map[string]voucherRequestState
+	// wholeChannelRedeem is set once the program turns out to predate the partial channel redeem
+	// (see redeemBatch); the node then redeems whole channel vouchers until it restarts.
+	wholeChannelRedeem atomic.Bool
 }
 
 func (r *Runtime) Jobs() []worker.Job {

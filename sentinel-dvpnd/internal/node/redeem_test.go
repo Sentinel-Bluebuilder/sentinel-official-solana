@@ -5,6 +5,7 @@ package node_test
 import (
 	"bytes"
 	"encoding/binary"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -436,6 +437,88 @@ func TestRuntime_Redeem_SkipsUnservedChannelVoucher(t *testing.T) {
 	var position node.Position
 	require.NoError(t, home.DB.First(&position, "address = ?", address.String()).Error)
 	require.Zero(t, position.Redeemed)
+}
+
+func TestRuntime_Redeem_ClaimNeverExceedsSignedVoucher(t *testing.T) {
+	t.Parallel()
+
+	r, home, _ := newRuntime(t)
+	address := seedChannel(t, r, home, home.OwnerKey, dvpn.PositionModeVoucher)
+	cumulative := home.Loaded.Node.Redeem.ThresholdBaseUnits * 10
+	seedPosition(t, r, home, address, cumulative)
+	require.NoError(t, home.DB.Model(&node.Position{}).Where("address = ?", address.String()).
+		Update("settled", cumulative+5).Error)
+
+	require.NoError(t, node.Redeem(t.Context(), r))
+
+	sent := home.RPC.Sent()
+	require.Len(t, sent, 1)
+	require.Equal(t, []uint64{cumulative}, partialClaims(t, sent[0].Message.Instructions[0].Data))
+}
+
+// oldProgramError is how a program without redeem_channel_vouchers_partial fails it: Anchor's
+// InstructionFallbackNotFound (101) on the first instruction.
+func oldProgramError() any {
+	return map[string]any{"InstructionError": []any{0, map[string]any{"Custom": 101}}}
+}
+
+func TestRuntime_Redeem_FallsBackToWholeVoucherOnOldProgram(t *testing.T) {
+	t.Parallel()
+
+	r, home, _ := newRuntime(t)
+	ownerB, err := solana.NewRandomPrivateKey()
+	require.NoError(t, err)
+
+	threshold := home.Loaded.Node.Redeem.ThresholdBaseUnits
+	addressA := seedChannel(t, r, home, home.OwnerKey, dvpn.PositionModeVoucher)
+	seedPosition(t, r, home, addressA, threshold*10)
+	require.NoError(t, home.DB.Model(&node.Position{}).Where("address = ?", addressA.String()).
+		Update("settled", threshold*2).Error)
+
+	var (
+		mu       sync.Mutex
+		attempts []bool // true when the attempt used the partial instruction
+	)
+
+	home.RPC.Simulate = func(sentTx *solana.Transaction) sdktest.SimulateResult {
+		partial := bytes.HasPrefix(sentTx.Message.Instructions[0].Data,
+			dvpn.RedeemChannelVouchersPartialInstructionDiscriminator[:])
+
+		mu.Lock()
+		attempts = append(attempts, partial)
+		mu.Unlock()
+
+		if partial {
+			return sdktest.SimulateResult{Err: oldProgramError()}
+		}
+
+		return sdktest.SimulateResult{UnitsConsumed: 5_000}
+	}
+
+	require.NoError(t, node.Redeem(t.Context(), r))
+
+	sent := home.RPC.Sent()
+	require.Len(t, sent, 1)
+	require.True(t, bytes.HasPrefix(sent[0].Message.Instructions[0].Data,
+		dvpn.RedeemChannelVouchersInstructionDiscriminator[:]))
+
+	var positionA node.Position
+	require.NoError(t, home.DB.First(&positionA, "address = ?", addressA.String()).Error)
+	require.Equal(t, threshold*10, positionA.Redeemed, "the old program redeems the whole voucher")
+
+	// The node remembers: the next redeem goes straight to the whole-voucher instruction.
+	addressB := seedChannel(t, r, home, ownerB, dvpn.PositionModeVoucher)
+	seedPosition(t, r, home, addressB, threshold*4)
+	require.NoError(t, node.Redeem(t.Context(), r))
+
+	mu.Lock()
+	got := slices.Clone(attempts)
+	mu.Unlock()
+	require.Equal(t, []bool{true, false, false}, got)
+
+	var positionB node.Position
+	require.NoError(t, home.DB.First(&positionB, "address = ?", addressB.String()).Error)
+	require.Equal(t, threshold*4, positionB.Redeemed)
 }
 
 func newFeeTransfer(t *testing.T, home testutil.Home, paymasterAddress solana.PublicKey) sdktest.FakeFeeTransfer {

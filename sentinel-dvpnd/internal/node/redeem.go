@@ -16,6 +16,7 @@ import (
 	"github.com/sentinel-official/sentinel-go-sdk/v3/paymaster"
 	"github.com/sentinel-official/sentinel-go-sdk/v3/program"
 	"github.com/sentinel-official/sentinel-go-sdk/v3/tx"
+	"github.com/sentinel-official/sentinel-programs/clients/go/core"
 	"github.com/sentinel-official/sentinel-programs/clients/go/dvpn"
 )
 
@@ -49,6 +50,10 @@ type redeemSubject struct {
 // (settled plus the live usage of active sessions), never more than the client signed. The rest of
 // the client's prepay lead stays in escrow and close_channel returns it to the client.
 func (r *Runtime) channelClaim(ctx context.Context, position *Position) uint64 {
+	if r.wholeChannelRedeem.Load() {
+		return position.Cumulative
+	}
+
 	settled, err := r.projectedSettled(ctx, position)
 	if err != nil {
 		r.log.Warn().Err(err).Str("position", position.Address).Msg("projecting settled credit; claiming the settled amount")
@@ -59,12 +64,53 @@ func (r *Runtime) channelClaim(ctx context.Context, position *Position) uint64 {
 	return min(position.Cumulative, settled)
 }
 
+// anchorInstructionFallbackNotFound is Anchor's error for an instruction the deployed program does
+// not have. A program that predates redeem_channel_vouchers_partial answers it with this code.
+const anchorInstructionFallbackNotFound = 101
+
+// partialRedeemMissing reports whether a send failed because the dvpn program has no partial
+// channel redeem yet.
+func (r *Runtime) partialRedeemMissing(err error) bool {
+	txErr, ok := errors.AsType[*core.TxError](err)
+
+	return ok && txErr.Code == anchorInstructionFallbackNotFound &&
+		txErr.Program == r.programClient.ProgramID.String()
+}
+
+// buildWholeChannelRedeem is redeem_channel_vouchers, used while the program lacks the partial one.
+func (r *Runtime) buildWholeChannelRedeem(
+	group *redeemGroup, sorted []solana.PublicKey, remaining []*solana.AccountMeta,
+) (solana.Instruction, error) {
+	vouchers := make([]dvpn.Voucher, 0, len(sorted))
+	for _, subject := range sorted {
+		vouchers = append(vouchers, group.subjects[subject].voucher)
+	}
+
+	params := dvpn.RedeemChannelVouchersParams{
+		Node:              r.address,
+		RemainingAccounts: remaining,
+		Signer:            r.signer,
+		Vouchers:          vouchers,
+	}
+
+	instruction, err := dvpn.BuildRedeemChannelVouchersInstruction(r.programClient.ProgramID, params)
+	if err != nil {
+		return nil, fmt.Errorf("building redeem_channel_vouchers instruction: %w", err)
+	}
+
+	return instruction, nil
+}
+
 func (r *Runtime) buildRedeemInstruction(group *redeemGroup, subjects []solana.PublicKey) (solana.Instruction, error) {
 	sorted := program.SortedUniqueSubjects(subjects)
 	remaining := r.programClient.RemainingAccounts(sorted...)
 
 	switch group.key {
 	case groupKey(KindChannel, dvpn.PositionModeVoucher):
+		if r.wholeChannelRedeem.Load() {
+			return r.buildWholeChannelRedeem(group, sorted, remaining)
+		}
+
 		vouchers := make([]dvpn.PartialVoucher, 0, len(sorted))
 		for _, subject := range sorted {
 			redeemed := group.subjects[subject]
@@ -286,6 +332,23 @@ func (r *Runtime) redeemBatch(ctx context.Context, group *redeemGroup, subjects 
 	receipt, sendErr := r.sender.Send(
 		ctx, r.privateKey, []solana.Instruction{instruction}, tx.WithLabel(redeemLabel), tx.WithComputeUnitLimit(units),
 	)
+
+	if sendErr != nil && group.key == groupKey(KindChannel, dvpn.PositionModeVoucher) &&
+		!r.wholeChannelRedeem.Load() && r.partialRedeemMissing(sendErr) {
+		// The program predates the partial redeem: keep getting paid with whole vouchers until a
+		// restart after the program upgrade.
+		r.wholeChannelRedeem.Store(true)
+		r.log.Warn().Err(sendErr).Msg("program has no redeem_channel_vouchers_partial; redeeming whole channel vouchers")
+
+		for _, subject := range subjects {
+			redeemed := group.subjects[subject]
+			redeemed.claim = redeemed.voucher.CumulativeAmount
+			group.subjects[subject] = redeemed
+		}
+
+		return r.redeemBatch(ctx, group, subjects)
+	}
+
 	now := time.Now().Unix()
 	row := Redemption{
 		Kind:     group.key,
