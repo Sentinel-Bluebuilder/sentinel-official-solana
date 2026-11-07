@@ -24,6 +24,7 @@ const (
 	reasonNodeOvercharging = "node overcharging"
 	reasonStatsUnavailable = "service stats unavailable"
 	reasonStoppedByUser    = "stopped by user"
+	reasonTunnelStalled    = "tunnel passes no traffic"
 )
 
 var (

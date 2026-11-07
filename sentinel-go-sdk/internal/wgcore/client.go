@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -21,6 +22,12 @@ const (
 	clientTemplate             = "templates/client.conf.tmpl"
 	livenessPollInterval       = 5 * time.Second
 	persistentKeepaliveSeconds = 25
+
+	// handshakeStallAfter is how long the client tolerates no handshake with the node. With the persistent
+	// keepalive above, WireGuard renews the handshake about every 2 minutes (it rekeys on the next packet 120 s
+	// after the last one) and retries a lost one for up to 90 s, so a working tunnel never goes this long
+	// without one. Past it the node is not answering on the data path, and keys older than 180 s carry no data.
+	handshakeStallAfter = 4 * time.Minute
 )
 
 var errNameFileEmpty = errors.New("interface name file is empty")
@@ -29,6 +36,8 @@ var _ service.ClientCleaner = (*Client[service.Validator])(nil)
 
 type Client[E service.Validator] struct {
 	conf            string
+	handshakeMu     sync.Mutex
+	handshakeAt     time.Time
 	live            string
 	log             zerolog.Logger
 	placement       service.Placement
@@ -37,6 +46,7 @@ type Client[E service.Validator] struct {
 	runner          runner
 	serverPublicKey string
 	started         bool
+	startedAt       time.Time
 	stop            service.StopOnce
 	stopped         chan struct{}
 	variant         Variant
@@ -168,6 +178,7 @@ func (c *Client[E]) Start(ctx context.Context, host string, resp service.PeerRes
 	c.live = live
 	c.serverPublicKey = p.PublicKey
 	c.started = true
+	c.startedAt = time.Now()
 	succeeded = true
 
 	c.log.Info().Str("iface", c.placement.Interface).Msg("service started")
@@ -185,7 +196,43 @@ func (c *Client[E]) Stats(ctx context.Context) (service.PeerStats, error) {
 		return service.PeerStats{}, fmt.Errorf("querying stats: %w", err)
 	}
 
+	if err := c.checkHandshake(ctx); err != nil {
+		return service.PeerStats{}, err
+	}
+
 	return transfer[c.serverPublicKey], nil
+}
+
+// checkHandshake returns service.ErrTunnelStalled when the node has not completed a handshake for
+// handshakeStallAfter, counting from the start when it never has. The interface can stay up with a dead data
+// path (the node stopped answering, or its UDP port is blocked), and the transfer counters alone can't tell
+// that apart from an idle session. It reads the handshake at most once per livenessPollInterval.
+func (c *Client[E]) checkHandshake(ctx context.Context) error {
+	c.handshakeMu.Lock()
+	defer c.handshakeMu.Unlock()
+
+	now := time.Now()
+	if !c.handshakeAt.IsZero() && now.Sub(c.handshakeAt) < livenessPollInterval {
+		return nil
+	}
+
+	c.handshakeAt = now
+
+	handshakes, err := c.runner.LatestHandshakes(ctx, c.Interface())
+	if err != nil {
+		return fmt.Errorf("querying handshakes: %w", err)
+	}
+
+	last := handshakes[c.serverPublicKey]
+	if last.IsZero() || last.Before(c.startedAt) {
+		last = c.startedAt
+	}
+
+	if age := now.Sub(last); age > handshakeStallAfter {
+		return fmt.Errorf("%w: no handshake with the node for %s", service.ErrTunnelStalled, age.Truncate(time.Second))
+	}
+
+	return nil
 }
 
 func (c *Client[E]) Stop(ctx context.Context) error {

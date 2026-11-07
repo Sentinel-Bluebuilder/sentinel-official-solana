@@ -598,3 +598,29 @@ func waitIssuerEnded(t *testing.T, home testutil.Home, id, reason string) {
 		return row.Status == client.SessionStatusEnded && row.Error == reason
 	}, 5*time.Second, 5*time.Millisecond)
 }
+
+func TestRuntime_IssueLoop_EndsWhenTheTunnelStalls(t *testing.T) {
+	t.Parallel()
+
+	rt, home, state := newIssuerFixture(t, 100_000, false)
+	client.SetTiming(rt, 20*time.Millisecond, time.Hour, 8, 30*time.Millisecond)
+
+	var stalled atomic.Bool
+
+	statsError := func() error {
+		if stalled.Load() {
+			return fmt.Errorf("%w: no handshake with the node for 4m10s", service.ErrTunnelStalled)
+		}
+
+		return nil
+	}
+	client.SetService(rt, sdktest.FakeName, fakeClientConfig{
+		hooks: clientHooks{onStatsError: &statsError},
+		state: state,
+	})
+	row := startIssuer(t, rt, home)
+
+	stalled.Store(true)
+
+	waitIssuerEnded(t, home, row.ID, "tunnel passes no traffic")
+}

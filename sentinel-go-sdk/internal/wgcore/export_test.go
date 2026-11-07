@@ -1,6 +1,8 @@
 package wgcore
 
 import (
+	"time"
+
 	"github.com/rs/zerolog"
 
 	"github.com/sentinel-official/sentinel-go-sdk/v3/service"
@@ -13,6 +15,12 @@ func AllowedIPs(goos string) string { return allowedIPs(goos) }
 func ClientPrivateKey[E service.Validator](c *Client[E]) string { return c.privateKey }
 
 func ClientPublicKey[E service.Validator](c *Client[E]) string { return c.publicKey }
+
+func ClientServerPublicKey[E service.Validator](c *Client[E]) string { return c.serverPublicKey }
+
+func ParseLatestHandshakes(out string) (map[string]time.Time, error) {
+	return parseLatestHandshakes(out)
+}
 
 func InterfaceFromNameFile(dir, iface string) (string, error) {
 	return interfaceFromNameFile(dir, iface)

@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/sentinel-official/sentinel-go-sdk/v3/service"
 )
@@ -97,6 +98,7 @@ func (r quickRunner) Up(ctx context.Context, conf string) (string, error) {
 type runner interface {
 	Cleanup(ctx context.Context, conf string, owned bool) error
 	Down(ctx context.Context, conf string) error
+	LatestHandshakes(ctx context.Context, iface string) (map[string]time.Time, error)
 	Transfer(ctx context.Context, iface string) (map[string]service.PeerStats, error)
 	RemovePeer(ctx context.Context, iface, publicKey string) error
 	SetPeer(ctx context.Context, iface, publicKey string, allowedIPs []netip.Prefix) error
@@ -177,6 +179,20 @@ func (r wgCLI) Transfer(ctx context.Context, iface string) (map[string]service.P
 	return parseTransfer(string(out))
 }
 
+func (r wgCLI) LatestHandshakes(ctx context.Context, iface string) (map[string]time.Time, error) {
+	cmd := service.Command{
+		Args: []string{"show", iface, "latest-handshakes"},
+		Path: r.binary,
+	}
+
+	out, err := r.exec(ctx, cmd)
+	if err != nil {
+		return nil, fmt.Errorf("%s show latest-handshakes: %w", r.binary, err)
+	}
+
+	return parseLatestHandshakes(string(out))
+}
+
 type windowsServiceRunner struct {
 	wgCLI
 
@@ -233,6 +249,39 @@ func interfaceNameFromConf(conf string) string {
 	}
 
 	return strings.TrimSuffix(base, ".conf")
+}
+
+// parseLatestHandshakes reads `wg show <iface> latest-handshakes` ("<public key>\t<unix seconds>" per peer).
+// A peer that never completed a handshake reads 0 and maps to the zero time.
+func parseLatestHandshakes(out string) (map[string]time.Time, error) {
+	handshakes := map[string]time.Time{}
+
+	sc := bufio.NewScanner(strings.NewReader(out))
+	for sc.Scan() {
+		fields := strings.Split(sc.Text(), "\t")
+		if len(fields) != 2 {
+			continue
+		}
+
+		unix, err := strconv.ParseInt(fields[1], 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("parsing latest handshakes: %w", err)
+		}
+
+		if unix == 0 {
+			handshakes[fields[0]] = time.Time{}
+
+			continue
+		}
+
+		handshakes[fields[0]] = time.Unix(unix, 0)
+	}
+
+	if err := sc.Err(); err != nil {
+		return nil, fmt.Errorf("parsing latest handshakes: %w", err)
+	}
+
+	return handshakes, nil
 }
 
 func parseTransfer(out string) (map[string]service.PeerStats, error) {

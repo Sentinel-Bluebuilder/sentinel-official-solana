@@ -37,6 +37,7 @@ var (
 	ErrPeerExists           = errors.New("peer already exists")
 	ErrPeerNotFound         = errors.New("peer not found")
 	ErrServiceNotStarted    = errors.New("not started")
+	ErrTunnelStalled        = errors.New("tunnel passes no traffic")
 	ErrUnexpectedConfigType = errors.New("unexpected config type")
 	ErrUnknownName          = errors.New("unknown service name")
 )

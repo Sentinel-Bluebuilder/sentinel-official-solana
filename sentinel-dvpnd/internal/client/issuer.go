@@ -13,6 +13,7 @@ import (
 	"github.com/sentinel-official/sentinel-go-sdk/v3/api"
 	daemonv1 "github.com/sentinel-official/sentinel-go-sdk/v3/daemon/v1"
 	"github.com/sentinel-official/sentinel-go-sdk/v3/nodeapi"
+	"github.com/sentinel-official/sentinel-go-sdk/v3/service"
 	"github.com/sentinel-official/sentinel-go-sdk/v3/session"
 )
 
@@ -537,6 +538,8 @@ func issueErrorReason(err error) string {
 		return reasonNodeOvercharging
 	case isInvalidResponse(err):
 		return reasonInvalidResponse
+	case errors.Is(err, service.ErrTunnelStalled):
+		return reasonTunnelStalled
 	case errors.Is(err, errStatsUnavailable):
 		return reasonStatsUnavailable
 	case errors.Is(err, api.ErrChannelNotOpen), errors.Is(err, api.ErrSessionNotFound):

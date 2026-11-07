@@ -34,6 +34,9 @@ type fakeRunner struct {
 	down          []string
 	downErr       error
 	downRemaining []time.Duration
+	handshakes    map[string]time.Time
+	handshakeErr  error
+	handshakeHits int
 	live          string
 	queried       []string
 	removed       []string
@@ -68,6 +71,15 @@ func (f *fakeRunner) Down(ctx context.Context, conf string) error {
 	}
 
 	return nil
+}
+
+func (f *fakeRunner) LatestHandshakes(_ context.Context, _ string) (map[string]time.Time, error) {
+	f.handshakeHits++
+	if f.handshakeErr != nil {
+		return nil, f.handshakeErr
+	}
+
+	return maps.Clone(f.handshakes), nil
 }
 
 func (f *fakeRunner) RemovePeer(_ context.Context, iface, publicKey string) error {
