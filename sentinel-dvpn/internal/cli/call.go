@@ -27,6 +27,17 @@ const (
 
 var errRoleNotServed = errors.New("role is not served")
 
+// daemonDownError is the plain-words answer for a daemon that isn't running. The gRPC transport error
+// stays in the chain (errors.As, status.Code) and in the debug log, not in the text the user reads.
+type daemonDownError struct {
+	msg string
+	err error
+}
+
+func (e *daemonDownError) Error() string { return e.msg }
+
+func (e *daemonDownError) Unwrap() error { return e.err }
+
 type callSpec[Resp any] struct {
 	AddFlags func(*pflag.FlagSet)
 	Args     cobra.PositionalArgs
@@ -86,7 +97,7 @@ func newStreamCallCmd[C, Req, Resp any](
 
 		stream, err := open(newClient(conn), ctx, req)
 		if err != nil {
-			return wrapCallError(spec.Role, tag, daemon.endpointFor(tag), err)
+			return daemon.callError(spec.Role, tag, err)
 		}
 
 		for {
@@ -96,7 +107,7 @@ func newStreamCallCmd[C, Req, Resp any](
 			}
 
 			if err != nil {
-				return wrapCallError(spec.Role, tag, daemon.endpointFor(tag), err)
+				return daemon.callError(spec.Role, tag, err)
 			}
 
 			var result any = resp
@@ -163,7 +174,7 @@ func newUnaryCallCmd[C, Req, Resp any](
 
 		resp, err := call(newClient(conn), ctx, req)
 		if err != nil {
-			return wrapCallError(spec.Role, tag, daemon.endpointFor(tag), err)
+			return daemon.callError(spec.Role, tag, err)
 		}
 
 		if spec.Render != nil {
@@ -201,11 +212,15 @@ func wrapCallError(role string, tag instance.Tag, endpoint string, err error) er
 	// it wraps these as "connection error: ... transport: ...") means the daemon is not running. A
 	// daemon-sent Unavailable is a plain app message (e.g. recovery pending or the daemon stopping): the
 	// daemon IS running but not ready, so telling the user to start it would be wrong and could start a
-	// second daemon onto the held instance. Keep the endpoint and %w so -v / json carry the gRPC detail.
+	// second daemon onto the held instance. The transport detail ("dial unix ...: connect: ...") adds
+	// nothing the user can act on, so it is kept in the chain and the debug log, not printed.
 	if status.Code(err) == codes.Unavailable {
 		if msg := status.Convert(err).Message(); strings.Contains(msg, "connection error") || strings.Contains(msg, "transport:") {
-			return fmt.Errorf("the %s service (instance %s) isn't running: start it with `sentinel-dvpnd service start --instance %s` (or run `sentinel-dvpnd run --instance %s` in a terminal) (%s): %w",
-				role, tag, tag, tag, endpoint, err)
+			return &daemonDownError{
+				msg: fmt.Sprintf("the %s service (instance %s) isn't running: start it with `sentinel-dvpnd service start --instance %s` (or run `sentinel-dvpnd run --instance %s` in a terminal) (%s)",
+					role, tag, tag, tag, endpoint),
+				err: err,
+			}
 		}
 
 		return fmt.Errorf("the %s daemon (instance %s) is not ready (starting up or stopping); try again (%s): %w",
