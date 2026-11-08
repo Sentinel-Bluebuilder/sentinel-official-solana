@@ -13,6 +13,7 @@ import (
 	"github.com/sentinel-official/sentinel-dvpnd/internal/config"
 	"github.com/sentinel-official/sentinel-dvpnd/internal/leftover"
 	"github.com/sentinel-official/sentinel-dvpnd/internal/testutil"
+	"github.com/sentinel-official/sentinel-go-sdk/v3/daemon/instance"
 	"github.com/sentinel-official/sentinel-go-sdk/v3/sdktest"
 	"github.com/sentinel-official/sentinel-go-sdk/v3/service"
 )
@@ -352,4 +353,30 @@ func TestRuntime_StartSession_IncompleteFirewallRowFails(t *testing.T) {
 	_, err := client.StartSession(t.Context(), rt, req)
 	require.ErrorIs(t, err, client.ErrFirewallRowIncomplete)
 	require.Empty(t, firewall.applies())
+}
+
+func TestRuntime_Recover_RemovesRecordedLiveInterface(t *testing.T) {
+	t.Parallel()
+
+	fakeRPC := sdktest.NewFakeRPC(t)
+	home := testutil.NewClientHome(t, fakeRPC)
+	rt := newRuntime(t, home, home.ProgramClient)
+	remover := &testutil.RecordingInterfaceRemover{}
+	client.SetInterfaceRemover(rt, remover)
+	client.SetDNSBackend(rt, &recordingDNSBackend{})
+	client.SetFirewallBackend(rt, &recordingFirewallBackend{})
+
+	// A hard kill left a marker naming a kernel-assigned interface (a macOS utun) that is not the
+	// tag's dvpn-<instance> name. Recovery must remove that interface too, so the CLI's promise —
+	// "start the service to recover and remove it" — holds for utun / OpenVPN, not only WireGuard.
+	marker := filepath.Join(home.Loaded.Dir, instance.TunnelIfaceFileName)
+	require.NoError(t, os.WriteFile(marker, []byte("utun7\n"), 0o600))
+
+	require.NoError(t, rt.Recover(t.Context()))
+
+	require.Contains(t, remover.Names, "utun7")
+	require.Contains(t, remover.Names, home.Loaded.Tag.Interface())
+
+	_, err := os.Stat(marker)
+	require.True(t, os.IsNotExist(err)) // marker cleared on recovery
 }

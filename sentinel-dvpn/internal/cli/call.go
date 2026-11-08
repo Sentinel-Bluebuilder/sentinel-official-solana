@@ -87,7 +87,7 @@ func newStreamCallCmd[C, Req, Resp any](
 
 		stream, err := open(newClient(conn), ctx, req)
 		if err != nil {
-			return wrapCallError(spec.Role, tag, daemon.endpointFor(tag), err, service.InterfaceNames)
+			return wrapCallError(spec.Role, tag, daemon.endpointFor(tag), err, service.InterfaceNames, func() string { return daemon.tunnelIface(tag) })
 		}
 
 		for {
@@ -97,7 +97,7 @@ func newStreamCallCmd[C, Req, Resp any](
 			}
 
 			if err != nil {
-				return wrapCallError(spec.Role, tag, daemon.endpointFor(tag), err, service.InterfaceNames)
+				return wrapCallError(spec.Role, tag, daemon.endpointFor(tag), err, service.InterfaceNames, func() string { return daemon.tunnelIface(tag) })
 			}
 
 			var result any = resp
@@ -164,7 +164,7 @@ func newUnaryCallCmd[C, Req, Resp any](
 
 		resp, err := call(newClient(conn), ctx, req)
 		if err != nil {
-			return wrapCallError(spec.Role, tag, daemon.endpointFor(tag), err, service.InterfaceNames)
+			return wrapCallError(spec.Role, tag, daemon.endpointFor(tag), err, service.InterfaceNames, func() string { return daemon.tunnelIface(tag) })
 		}
 
 		if spec.Render != nil {
@@ -189,7 +189,7 @@ func newUnaryCallCmd[C, Req, Resp any](
 	return cmd
 }
 
-func wrapCallError(role string, tag instance.Tag, endpoint string, err error, ifaces func() (map[string]bool, error)) error {
+func wrapCallError(role string, tag instance.Tag, endpoint string, err error, ifaces func() (map[string]bool, error), liveIface func() string) error {
 	if role == "" {
 		role = "daemon"
 	}
@@ -205,15 +205,20 @@ func wrapCallError(role string, tag instance.Tag, endpoint string, err error, if
 	// second daemon onto the held instance. Keep the endpoint and %w so -v / json carry the gRPC detail.
 	if status.Code(err) == codes.Unavailable {
 		if msg := status.Convert(err).Message(); strings.Contains(msg, "connection error") || strings.Contains(msg, "transport:") {
-			// A hard-killed daemon leaves its tunnel interface (dvpn-<instance>) up with routes still
-			// pointing into it; a graceful stop tears it down. Either way, starting the service recovers
-			// and removes it, so warn when the leftover interface is present. This matches only the
-			// dvpn-<instance> name the daemon assigns (WireGuard/AWG on Linux and Windows, and hysteria2
-			// where the daemon names the tun). A kernel-named interface (macOS utun, or an OpenVPN /
-			// detected name) is not matched here; the daemon's restart recovery still removes those.
-			if names, nerr := ifaces(); nerr == nil && names[tag.Interface()] {
+			// A hard-killed daemon leaves its tunnel interface up with routes still pointing into it; a
+			// graceful stop tears it down. Either way, starting the service recovers and removes it, so
+			// warn when the leftover interface is present. The daemon records the live interface name
+			// (whatever the OS assigned: dvpn-<instance>, a macOS utun, or an OpenVPN/detected name) in
+			// the instance state dir while a session is up; read it here. When the record is absent (old
+			// state, or no session was active) fall back to the dvpn-<instance> name the daemon assigns.
+			want := tag.Interface()
+			if live := liveIface(); live != "" {
+				want = live
+			}
+
+			if names, nerr := ifaces(); nerr == nil && names[want] {
 				return fmt.Errorf("the %s service (instance %s) isn't running, but a tunnel it started (%s) is still up; start the service to recover and remove it: `sentinel-dvpnd service start --instance %s` (or run `sentinel-dvpnd run --instance %s` in a terminal) (%s): %w",
-					role, tag, tag.Interface(), tag, tag, endpoint, err)
+					role, tag, want, tag, tag, endpoint, err)
 			}
 
 			return fmt.Errorf("the %s service (instance %s) isn't running: start it with `sentinel-dvpnd service start --instance %s` (or run `sentinel-dvpnd run --instance %s` in a terminal) (%s): %w",

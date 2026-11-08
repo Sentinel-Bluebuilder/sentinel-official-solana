@@ -60,6 +60,16 @@ func (r *Runtime) Recover(ctx context.Context) error {
 		return fmt.Errorf("%w: %w", ErrServiceCleanupFailed, err)
 	}
 
+	// RemoveInterface above removes the tag's dvpn-<instance> name. A service that names its own
+	// interface (a macOS utun, an OpenVPN device) recorded the live name in the marker; remove that
+	// too so the leftover a hard kill left behind is gone, which is what the CLI's message promises.
+	// Best-effort: an already-removed interface (e.g. cleared by clearLeftovers) must not fail Recover.
+	if live := readTunnelIface(r.dir); live != "" && live != r.iface {
+		if err := r.remover.RemoveInterface(cctx, live); err != nil {
+			r.log.Warn().Err(err).Str("iface", live).Msg("removing the recorded live tunnel interface")
+		}
+	}
+
 	removeTunnelIface(r.dir, r.log)
 
 	if err := r.dnsBackend.Cleanup(cctx); err != nil {

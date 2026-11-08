@@ -3,6 +3,7 @@ package client
 import (
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/rs/zerolog"
 
@@ -54,6 +55,21 @@ func writeTunnelIface(dir, iface string, log zerolog.Logger) {
 	if err := os.Rename(tmpName, path); err != nil {
 		log.Warn().Err(err).Str("path", path).Msg("recording tunnel interface marker")
 	}
+}
+
+// readTunnelIface returns the recorded live tunnel interface name, or "" when none is recorded or
+// it cannot be read. Recovery uses it to remove the exact interface a session left behind.
+func readTunnelIface(dir string) string {
+	if dir == "" {
+		return ""
+	}
+
+	raw, err := os.ReadFile(filepath.Join(dir, instance.TunnelIfaceFileName))
+	if err != nil {
+		return ""
+	}
+
+	return strings.TrimSpace(string(raw))
 }
 
 // removeTunnelIface clears the marker on teardown or recovery. A missing marker is not an error.
