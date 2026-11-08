@@ -24,6 +24,13 @@ const (
 	reasonNodeOvercharging = "node overcharging"
 	reasonStatsUnavailable = "service stats unavailable"
 	reasonStoppedByUser    = "stopped by user"
+	// reasonPathStopped: the fork ends a dead data path with this (Q0366) after a failed redial; kept
+	// here so keepsFirewall matches the fork exactly. On this base the reconnect loop handles a dead
+	// path and the end arrives as connection lost / service stats unavailable, which keepsFirewall holds.
+	reasonPathStopped = "the connection to this server stopped working"
+	// reasonUsageUnconfirmed: referenced by keepsFirewall for parity with the fork (Q0195); base does
+	// not yet produce it, but the kill-switch rule is identical.
+	reasonUsageUnconfirmed = "node usage unconfirmed: local counter stalled"
 )
 
 var (
@@ -401,14 +408,15 @@ func (r *Runtime) teardown(ctx context.Context, conn *connection, reason string)
 
 	result.dnsRevertFailed = r.revertDNS(ctx) != nil
 
-	if reason != reasonConnectionLost &&
-		(reason != reasonDaemonStopping || r.cfg.Network.KillSwitch != config.KillSwitchPersist) {
+	if !keepsFirewall(reason, r.cfg.Network.KillSwitch) {
 		released, err := r.releaseFirewall(ctx, false)
 		if err != nil {
 			r.log.Error().Err(err).Msg("releasing the kill switch; StopSession retries it")
 		}
 
 		result.killSwitchReleased = released
+	} else if r.cfg.Network.KillSwitch != config.KillSwitchOff && reason != reasonStoppedByUser {
+		r.log.Warn().Str("kill_switch", r.cfg.Network.KillSwitch).Str("reason", reason).Msg("the session ended but the kill switch is still blocking the internet; disconnect to restore normal internet")
 	}
 
 	if sessionID == "" {
@@ -466,4 +474,26 @@ func (r *Runtime) watch(sessionID string) (*watcher, *Session) {
 	copied := *s
 
 	return w, &copied
+}
+
+// keepsFirewall decides whether a session end KEEPS the kill-switch block in place. Ported from the
+// fork (Q0256 owner decision, 2026-10-29): "on" keeps the block when billing ends too (escrow
+// exhausted, node overcharging, the node closing or forgetting the session, a daemon restart) — no
+// lift, no leak. Only the user (Disconnect / Restore network), a daemon stop (persist keeps even
+// that) and kill switch off lift it. "persist" keeps the block for every end the user did not ask for.
+func keepsFirewall(reason, killSwitch string) bool {
+	if killSwitch == config.KillSwitchPersist && reason != reasonStoppedByUser {
+		return true
+	}
+
+	switch reason {
+	case reasonConnectionLost, reasonPathStopped, reasonStatsUnavailable, reasonUsageUnconfirmed:
+		return true
+	case reasonDaemonStopping:
+		return killSwitch == config.KillSwitchPersist
+	case reasonStoppedByUser:
+		return false
+	default:
+		return killSwitch == config.KillSwitchOn
+	}
 }
