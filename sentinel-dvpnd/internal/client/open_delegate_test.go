@@ -26,10 +26,14 @@ func TestRuntime_StartSession_InsufficientFundsNamesTheDelegateFix(t *testing.T)
 	for _, tc := range []struct {
 		name     string
 		approved bool
+		code     string // the Token-2022 custom error: 0x1 InsufficientFunds, 0x4 OwnerMismatch
+		raw      string
 		want     string
 	}{
-		{name: "no approval", want: "approve-delegate"},
-		{name: "approved", approved: true, want: "wallet balance or allowance is below the escrow"},
+		{name: "no approval", code: "0x1", raw: "InsufficientFunds", want: "approve-delegate"},
+		{name: "approved", approved: true, code: "0x1", raw: "InsufficientFunds", want: "wallet balance or allowance is below the escrow"},
+		// A revoked approval: the config is no longer the delegate, and Token-2022 says "owner does not match".
+		{name: "revoked approval", code: "0x4", raw: "OwnerMismatch", want: "approve-delegate"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -41,12 +45,12 @@ func TestRuntime_StartSession_InsufficientFundsNamesTheDelegateFix(t *testing.T)
 			programClient := installOpenChannelReactor(t, fakeRPC, home)
 			fakeRPC.Simulate = func(*solana.Transaction) sdktest.SimulateResult {
 				return sdktest.SimulateResult{
-					Err: map[string]any{"InstructionError": []any{0, map[string]any{"Custom": 1}}},
+					Err: map[string]any{"InstructionError": []any{0, map[string]any{"Custom": customCode(tc.code)}}},
 					Logs: []string{
 						"Program " + programClient.ProgramID.String() + " invoke [1]",
 						"Program " + solana.Token2022ProgramID.String() + " invoke [2]",
-						"Program " + solana.Token2022ProgramID.String() + " failed: custom program error: 0x1",
-						"Program " + programClient.ProgramID.String() + " failed: custom program error: 0x1",
+						"Program " + solana.Token2022ProgramID.String() + " failed: custom program error: " + tc.code,
+						"Program " + programClient.ProgramID.String() + " failed: custom program error: " + tc.code,
 					},
 				}
 			}
@@ -72,8 +76,16 @@ func TestRuntime_StartSession_InsufficientFundsNamesTheDelegateFix(t *testing.T)
 			defer cancel()
 
 			_, err = client.StartSession(ctx, rt, newChannelRequest(home.NodeAddress.String()))
-			require.ErrorContains(t, err, "InsufficientFunds")
+			require.ErrorContains(t, err, tc.raw)
 			require.ErrorContains(t, err, tc.want)
 		})
 	}
+}
+
+func customCode(hex string) int {
+	if hex == "0x4" {
+		return 4
+	}
+
+	return 1
 }

@@ -519,12 +519,13 @@ func isDefinitiveOpenFailure(err error) bool {
 	return ok && !failed.PriorIndeterminate
 }
 
-// explainOpenFailure adds the fix to a Token-2022 "insufficient funds" refusal of open_channel. The
-// program moves the escrow as the owner's delegate, so a missing or used-up approval fails exactly
-// like an empty wallet, and the raw error named neither.
+// explainOpenFailure adds the fix to a Token-2022 refusal of open_channel. The program moves the
+// escrow as the owner's delegate, so a missing or used-up approval fails exactly like an empty wallet
+// ("insufficient funds"), and a revoked one as "owner does not match" (the config is no longer the
+// delegate); the raw error named neither.
 func (r *Runtime) explainOpenFailure(ctx context.Context, err error, escrow uint64) error {
 	txErr, ok := errors.AsType[*core.TxError](err)
-	if !ok || txErr.Program != "token-2022" || txErr.Name != "InsufficientFunds" {
+	if !ok || txErr.Program != "token-2022" || (txErr.Name != "InsufficientFunds" && txErr.Name != "OwnerMismatch") {
 		return err
 	}
 
