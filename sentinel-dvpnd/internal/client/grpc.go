@@ -65,6 +65,16 @@ func (g *grpcServer) ListSessions(
 		return nil, daemonv1.ToStatus(err)
 	}
 
+	// The DB row of the current session can lag its live state (a redial ends the old row before the redial
+	// finishes): list what status says, so `client sessions` and `client status <id>` agree.
+	if current, ok := g.runtime.current(); ok {
+		for i := range sessions {
+			if sessions[i].ID == current.ID {
+				sessions[i] = *current
+			}
+		}
+	}
+
 	response := &daemonv1.ListSessionsResponse{}
 	for i := range sessions {
 		response.Sessions = append(response.Sessions, toProtoSession(&sessions[i]))

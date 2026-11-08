@@ -55,6 +55,9 @@ func ConnectionHeartbeat(r *Runtime) time.Duration {
 
 func Current(r *Runtime) (*Session, bool) { return r.current() }
 
+func ListSessionsFor(ctx context.Context, r *Runtime) (*daemonv1.ListSessionsResponse, error) {
+	return (&grpcServer{runtime: r}).ListSessions(ctx, &daemonv1.ListSessionsRequest{})
+}
 func IssueErrorReason(err error) string { return issueErrorReason(err) }
 
 func NewDarwinDNSBackend(kind, dir string, run runFunc) dnsBackend {

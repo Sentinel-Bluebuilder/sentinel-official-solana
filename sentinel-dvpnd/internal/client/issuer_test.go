@@ -684,3 +684,19 @@ func waitIssuerEnded(t *testing.T, home testutil.Home, id, reason string) {
 		return row.Status == client.SessionStatusEnded && row.Error == reason
 	}, 5*time.Second, 5*time.Millisecond)
 }
+
+func TestRuntime_Reconnect_ListShowsTheRedialAsReconnecting(t *testing.T) {
+	t.Parallel()
+
+	rt, _, row := redialWindow(t)
+	listed, err := client.ListSessionsFor(t.Context(), rt)
+	require.NoError(t, err)
+
+	var status string
+	for _, s := range listed.GetSessions() {
+		if s.GetId() == row.ID {
+			status = s.GetStatus()
+		}
+	}
+	require.Equal(t, client.SessionStatusReconnecting, status, "the list must agree with status during a redial")
+}
