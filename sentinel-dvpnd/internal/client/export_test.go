@@ -191,6 +191,12 @@ func StartSession(ctx context.Context, r *Runtime, req *daemonv1.StartSessionReq
 	return r.startSession(ctx, req)
 }
 
+func StopSessionByID(ctx context.Context, r *Runtime, id string) error {
+	_, err := r.stopSessionByID(ctx, reasonStoppedByUser, id)
+
+	return err
+}
+
 func StopSession(ctx context.Context, r *Runtime) error {
 	_, err := r.stopSession(ctx, reasonStoppedByUser)
 

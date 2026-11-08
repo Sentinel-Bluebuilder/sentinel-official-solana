@@ -38,20 +38,23 @@ var (
 )
 
 type connection struct {
-	block                   uint64
-	cancel                  context.CancelFunc
-	channel                 *Channel
-	heartbeat               time.Duration
-	iface                   string
-	issueMu                 sync.Mutex
-	lastContactUnix         int64
-	minBlock                uint64
-	nodeClient              *nodeapi.ClientWithResponses
-	nodeOwed                uint64
-	nodeSettled             uint64
-	nodeUsage               session.Usage
-	payer                   *session.Payer
-	pollFailingSinceUnix    int64
+	block                uint64
+	cancel               context.CancelFunc
+	channel              *Channel
+	heartbeat            time.Duration
+	iface                string
+	issueMu              sync.Mutex
+	lastContactUnix      int64
+	minBlock             uint64
+	nodeClient           *nodeapi.ClientWithResponses
+	nodeOwed             uint64
+	nodeSettled          uint64
+	nodeUsage            session.Usage
+	payer                *session.Payer
+	pollFailingSinceUnix int64
+	// redialOf is set on the placeholder of an automatic reconnect: the session being redialled. Status shows it
+	// as reconnecting, a stop by its ID cancels the redial, and a new start replaces the redial.
+	redialOf                *Session
 	remoteClosed            bool
 	replaces                []string
 	service                 service.Client
@@ -129,7 +132,13 @@ func (r *Runtime) claim() (*connection, context.Context, turn, error) {
 	}
 
 	if r.connection != nil {
-		return nil, nil, turn{}, ErrSessionActive
+		if r.connection.redialOf == nil {
+			return nil, nil, turn{}, ErrSessionActive
+		}
+
+		// A start while the daemon redials a lost node replaces the redial: cancelling its lifecycle ends the
+		// reconnect loop, and a redial that completes anyway no longer owns the connection and is torn down.
+		r.clearConnectionLocked()
 	}
 
 	lifecycle, cancel := context.WithCancel(context.Background())
@@ -205,6 +214,14 @@ func (r *Runtime) owns(placeholder *connection) bool {
 }
 
 func (r *Runtime) publishLocked() {
+	if r.connection != nil && r.connection.session.ID == "" && r.connection.redialOf != nil {
+		redial := *r.connection.redialOf
+		redial.Status = SessionStatusReconnecting
+		r.snapshot.Store(&redial)
+
+		return
+	}
+
 	if r.connection == nil || r.connection.session.ID == "" {
 		r.snapshot.Store(nil)
 
@@ -359,6 +376,7 @@ func (r *Runtime) takeConnection(reason, id string) (*connection, turn, error) {
 	}
 
 	conn := r.connection
+	// A redial placeholder carries the redialled id in replaces, so a stop by it also cancels the redial.
 	if id != "" && conn != nil && conn.session.ID != id && !slices.Contains(conn.replaces, id) {
 		return nil, turn{}, errMissingSession
 	}

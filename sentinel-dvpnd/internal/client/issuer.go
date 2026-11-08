@@ -119,7 +119,12 @@ func (r *Runtime) issueLoop(ctx context.Context, conn *connection) (string, bool
 		timedOut := now.Unix()-conn.lastContactUnix > timeout ||
 			(conn.pollFailingSinceUnix != 0 && now.Unix()-conn.pollFailingSinceUnix > timeout) ||
 			(conn.voucherFailingSinceUnix != 0 && now.Unix()-conn.voucherFailingSinceUnix > timeout)
+		contact, changed := r.markContactLocked(conn, now)
 		r.mu.Unlock()
+
+		if changed {
+			r.notify(&contact)
+		}
 
 		if timedOut {
 			conn.issueMu.Unlock()
@@ -154,6 +159,34 @@ func (r *Runtime) issueLoop(ctx context.Context, conn *connection) (string, bool
 			r.log.Warn().Err(err).Msg("issuing voucher failed")
 		}
 	}
+}
+
+// markContactLocked reports a session the node cannot be reached for as reconnecting, long before the node timeout
+// redials it: the first failing poll, or no contact (heartbeat, poll, voucher) for two poll intervals. Without it
+// status says active through a whole node outage while traffic is dead. The next contact makes it active again.
+// Returns the session and whether its status changed (the caller notifies watchers outside r.mu).
+func (r *Runtime) markContactLocked(conn *connection, now time.Time) (Session, bool) {
+	if conn.session.Status != SessionStatusActive && conn.session.Status != SessionStatusReconnecting {
+		return conn.session, false
+	}
+
+	stale := max(2, int64(2*r.pollInterval/time.Second))
+	status := SessionStatusActive
+
+	if conn.pollFailingSinceUnix != 0 || now.Unix()-conn.lastContactUnix > stale {
+		status = SessionStatusReconnecting
+	}
+
+	if conn.session.Status == status {
+		return conn.session, false
+	}
+
+	conn.session.Status = status
+	if r.connection == conn {
+		r.publishLocked()
+	}
+
+	return conn.session, true
 }
 
 func (r *Runtime) issueWhenDue(ctx context.Context, conn *connection, local session.Usage, now time.Time) error {
@@ -228,7 +261,8 @@ func (r *Runtime) reconnect(
 		return nil, false
 	}
 
-	placeholder := &connection{cancel: conn.cancel, replaces: append(slices.Clone(conn.replaces), conn.session.ID)}
+	redial := conn.session
+	placeholder := &connection{cancel: conn.cancel, replaces: append(slices.Clone(conn.replaces), conn.session.ID), redialOf: &redial}
 	r.connection = placeholder
 	r.publishLocked()
 
