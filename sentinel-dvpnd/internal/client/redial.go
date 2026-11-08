@@ -107,6 +107,10 @@ func (p redialPolicy) run(ctx context.Context, wake <-chan struct{}, try func(at
 			}
 		}
 
+		if !networkDown(err) {
+			downSince = time.Time{} // the network was back: a later outage gets its own wait
+		}
+
 		down = false
 		attempt++
 		backoff *= 2

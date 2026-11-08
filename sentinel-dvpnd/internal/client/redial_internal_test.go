@@ -131,3 +131,30 @@ func TestNetworkDown(t *testing.T) {
 	require.False(t, networkDown(errors.New("dial tcp 10.0.0.1:443: connect: connection refused")))
 	require.False(t, networkDown(nil))
 }
+
+// FWX review: the wait is per outage. The network came back (a try failed for a node reason), then
+// dropped again: the second outage waits too, not only what is left of the first one's 120 s.
+func TestRedial_EachOutageGetsItsOwnWait(t *testing.T) {
+	t.Parallel()
+
+	p, _ := fakeRedial(3)
+	tries := 0
+
+	ok := p.run(context.Background(), nil, func(uint, bool) error {
+		tries++
+
+		switch {
+		case tries <= 50: // first outage, 100 s
+			return noNetwork()
+		case tries == 51: // the network is back; the node did not answer
+			return errors.New("dial tcp 35.238.250.188:18711: i/o timeout")
+		case tries <= 101: // second outage, 100 s more
+			return noNetwork()
+		default:
+			return nil
+		}
+	})
+
+	require.True(t, ok, "the second outage was waited for as well")
+	require.Equal(t, 102, tries)
+}
