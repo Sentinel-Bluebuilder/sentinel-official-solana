@@ -38,31 +38,31 @@ var (
 )
 
 type connection struct {
-	block                uint64
-	cancel               context.CancelFunc
-	channel              *Channel
-	heartbeat            time.Duration
-	iface                string
-	issueMu              sync.Mutex
-	lastContactUnix      int64
-	minBlock             uint64
-	nodeClient           *nodeapi.ClientWithResponses
-	nodeOwed             uint64
-	nodeSettled          uint64
-	nodeUsage            session.Usage
-	payer                *session.Payer
-	pollFailingSinceUnix int64
+	block            uint64
+	cancel           context.CancelFunc
+	channel          *Channel
+	heartbeat        time.Duration
+	iface            string
+	issueMu          sync.Mutex
+	lastContact      time.Duration // monoNow() of the last node answer
+	minBlock         uint64
+	nodeClient       *nodeapi.ClientWithResponses
+	nodeOwed         uint64
+	nodeSettled      uint64
+	nodeUsage        session.Usage
+	payer            *session.Payer
+	pollFailingSince time.Duration // monoNow() of the first failed poll; 0 = not failing
 	// redialOf is set on the placeholder of an automatic reconnect: the session being redialled. Status shows it
 	// as reconnecting, a stop by its ID cancels the redial, and a new start replaces the redial.
-	redialOf                *Session
-	remoteClosed            bool
-	replaces                []string
-	service                 service.Client
-	session                 Session
-	statsFailures           uint
-	streamClient            *nodeapi.ClientWithResponses
-	terms                   session.Terms
-	voucherFailingSinceUnix int64
+	redialOf            *Session
+	remoteClosed        bool
+	replaces            []string
+	service             service.Client
+	session             Session
+	statsFailures       uint
+	streamClient        *nodeapi.ClientWithResponses
+	terms               session.Terms
+	voucherFailingSince time.Duration // monoNow() of the first failed voucher; 0 = not failing
 }
 
 type startResult struct {
@@ -415,6 +415,7 @@ func (r *Runtime) teardown(ctx context.Context, conn *connection, reason string)
 		}
 
 		r.stopService(ctx, conn.service)
+		r.dropPinnedConns("tunnel down")
 	}
 
 	var result stopResult
@@ -507,4 +508,19 @@ func (r *Runtime) liveSession(id string) (*Session, bool) {
 	conn := r.connection
 
 	return s, conn != nil && conn.session.ID == s.ID && slices.Contains(conn.replaces, id)
+}
+
+// dropPinnedConns closes every connection dialled through the pin (chain RPC and node API) when the
+// tunnel comes up or goes down. Their sockets keep the source address and route they were opened on:
+// one opened before the tunnel keeps the physical address and, once the tunnel carries the route, its
+// packets go into the tunnel with a source the peer does not accept, so the request hangs until its
+// timeout. The HTTP clients redial on their next request, over the current route.
+func (r *Runtime) dropPinnedConns(why string) {
+	if r.pin == nil {
+		return
+	}
+
+	if n := r.pin.CloseConns(); n > 0 {
+		r.log.Debug().Int("closed", n).Str("why", why).Msg("dropped pooled connections")
+	}
 }
