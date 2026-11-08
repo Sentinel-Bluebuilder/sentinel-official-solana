@@ -12,7 +12,6 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/sentinel-official/sentinel-dvpnd/internal/config"
-	"github.com/sentinel-official/sentinel-dvpnd/internal/leftover"
 	"github.com/sentinel-official/sentinel-dvpnd/internal/rpcpin"
 	"github.com/sentinel-official/sentinel-go-sdk/v3/amneziawg"
 	"github.com/sentinel-official/sentinel-go-sdk/v3/api"
@@ -107,23 +106,27 @@ func (r *Runtime) clearLeftovers(ctx context.Context) error {
 	names := slices.Concat(first, rest)
 	dirs := make([]string, 0, len(names))
 
+	var result error
+
 	for _, name := range names {
 		dirs = append(dirs, r.placement(name).ToolDir)
 
-		// A stale service's leftovers are old artifacts of a previous run, not a live leak, so a
-		// failure to clear one (e.g. permission denied on a non-root run) must not abort daemon
-		// start. Log it and move on; the live interface, firewall and DNS cleanups stay fatal.
+		// clearServiceLeftovers tears down a previous run's LIVE state: a stale tunnel process
+		// (KillStale), the stale interface (the runner's Cleanup), an orphan adapter. A failure
+		// there can leave a live tunnel up, so it stays fatal.
 		if err := r.clearServiceLeftovers(ctx, name); err != nil {
-			r.log.Error().Err(err).Str("service", string(name)).
-				Msg("clearing a stale service's leftovers; continuing daemon start")
+			result = errors.Join(result, fmt.Errorf("clearing %s leftovers: %w", name, err))
 		}
 	}
 
-	if err := leftover.RemoveCopies(dirs, r.iface); err != nil {
+	// Removing leftover tool-dir file COPIES is best-effort: a stale copy (e.g. root-owned, from
+	// a prior privileged run, that a later non-root run cannot delete) is an old artifact, not a
+	// live leak, and is overwritten on the next start, so it must not abort recovery.
+	if err := r.removeCopies(dirs, r.iface); err != nil {
 		r.log.Error().Err(err).Msg("removing leftover tool-dir copies; continuing daemon start")
 	}
 
-	return nil
+	return result
 }
 
 func (r *Runtime) clearServiceLeftovers(ctx context.Context, name service.Name) error {
