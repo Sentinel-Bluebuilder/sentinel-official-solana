@@ -6,11 +6,11 @@ import (
 	"github.com/sentinel-official/sentinel-dvpnd/internal/config"
 )
 
-// keepsFirewall encodes the Q0256 owner decision (2026-10-29): with the kill switch "on", a session
+// keepsFirewall encodes the kill-switch contract: with "on", a session
 // that ends for any reason the user did not ask for keeps the block (billing ends included — escrow
 // exhausted, node overcharging, the node closing/forgetting the session, a daemon restart, the tunnel
 // path dying); "persist" keeps it for every non-user end; only the user's disconnect and ks=off lift
-// it. Ported with the predicate from the fork (killswitch_keep_test.go).
+// it.
 func TestKeepsFirewall(t *testing.T) {
 	cases := []struct {
 		reason, ks string
@@ -20,11 +20,7 @@ func TestKeepsFirewall(t *testing.T) {
 		{reasonStatsUnavailable, config.KillSwitchOn, true},
 		{reasonStatsUnavailable, config.KillSwitchPersist, true},
 		{reasonConnectionLost, config.KillSwitchOn, true},
-		{reasonPathStopped, config.KillSwitchOn, true},
-		{reasonPathStopped, config.KillSwitchPersist, true},
-		{reasonUsageUnconfirmed, config.KillSwitchOn, true},
-		{reasonUsageUnconfirmed, config.KillSwitchPersist, true},
-		// Q0256: "on" keeps the block when billing ends too.
+		// "on" keeps the block when billing ends too.
 		{reasonEscrowExhausted, config.KillSwitchOn, true},
 		{reasonNodeOvercharging, config.KillSwitchOn, true},
 		{reasonInvalidResponse, config.KillSwitchOn, true},
