@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -196,11 +197,19 @@ func wrapCallError(role string, tag instance.Tag, endpoint string, err error) er
 		return fmt.Errorf("%s %w: %w", role, errRoleNotServed, err)
 	}
 
-	// A stopped daemon surfaces as Unavailable: say so plainly and how to start it, keeping the endpoint
-	// and wrapping the raw error with %w so -v / json still carry the gRPC detail.
+	// Unavailable has two very different causes. A transport failure (gRPC could not reach the socket;
+	// it wraps these as "connection error: ... transport: ...") means the daemon is not running. A
+	// daemon-sent Unavailable is a plain app message (e.g. recovery pending or the daemon stopping): the
+	// daemon IS running but not ready, so telling the user to start it would be wrong and could start a
+	// second daemon onto the held instance. Keep the endpoint and %w so -v / json carry the gRPC detail.
 	if status.Code(err) == codes.Unavailable {
-		return fmt.Errorf("the %s service (instance %s) isn't running: start it with `sentinel-dvpnd run --instance %s` (%s): %w",
-			role, tag, tag, endpoint, err)
+		if msg := status.Convert(err).Message(); strings.Contains(msg, "connection error") || strings.Contains(msg, "transport:") {
+			return fmt.Errorf("the %s service (instance %s) isn't running: start it with `sentinel-dvpnd service start --instance %s` (or run `sentinel-dvpnd run --instance %s` in a terminal) (%s): %w",
+				role, tag, tag, tag, endpoint, err)
+		}
+
+		return fmt.Errorf("the %s daemon (instance %s) is not ready (starting up or stopping); try again (%s): %w",
+			role, tag, endpoint, err)
 	}
 
 	return fmt.Errorf("calling daemon: %w", err)

@@ -241,9 +241,14 @@ func TestWrapCallError(t *testing.T) {
 			want: "node role is not served: rpc error: code = Unimplemented desc = method X not implemented",
 		},
 		{
-			err:  status.Error(codes.Unavailable, "connection refused"),
-			name: "unavailable",
-			want: "the node service (instance c0) isn't running: start it with `sentinel-dvpnd run --instance c0` (/tmp/daemon.sock): rpc error: code = Unavailable desc = connection refused",
+			err:  status.Error(codes.Unavailable, `connection error: desc = "transport: Error while dialing: dial unix /tmp/daemon.sock: connect: no such file or directory"`),
+			name: "unavailable_transport",
+			want: "the node service (instance c0) isn't running: start it with `sentinel-dvpnd service start --instance c0` (or run `sentinel-dvpnd run --instance c0` in a terminal) (/tmp/daemon.sock): rpc error: code = Unavailable desc = connection error: desc = \"transport: Error while dialing: dial unix /tmp/daemon.sock: connect: no such file or directory\"",
+		},
+		{
+			err:  status.Error(codes.Unavailable, "unavailable: the kill switch and sessions a previous run left are still being recovered"),
+			name: "unavailable_recovery",
+			want: "the node daemon (instance c0) is not ready (starting up or stopping); try again (/tmp/daemon.sock): rpc error: code = Unavailable desc = unavailable: the kill switch and sessions a previous run left are still being recovered",
 		},
 		{
 			err:  status.Error(codes.Internal, "boom"),
