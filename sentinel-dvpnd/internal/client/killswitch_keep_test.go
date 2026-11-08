@@ -34,6 +34,11 @@ func TestKeepsFirewall(t *testing.T) {
 		// Daemon stopping: only persist keeps it.
 		{reasonDaemonStopping, config.KillSwitchOn, false},
 		{reasonDaemonStopping, config.KillSwitchPersist, true},
+		// A server switch (StopSession with keep_kill_switch): the next session takes the block over,
+		// with the kill switch on or persist; off holds nothing (#53).
+		{reasonSwitching, config.KillSwitchOn, true},
+		{reasonSwitching, config.KillSwitchPersist, true},
+		{reasonSwitching, config.KillSwitchOff, false},
 		// Negative controls: the user's disconnect always lifts it; ks=off holds nothing.
 		{reasonStoppedByUser, config.KillSwitchOn, false},
 		{reasonStoppedByUser, config.KillSwitchPersist, false},
