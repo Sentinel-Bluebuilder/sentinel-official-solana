@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"errors"
+	"net"
 	"strings"
 	"syscall"
 	"time"
@@ -19,8 +20,11 @@ const (
 )
 
 // networkDown reports a failure that says this host has no network at all, so nothing about the node
-// can be learnt from it: no route to any address (ENETUNREACH; Windows: WSAENETUNREACH). A dead or
-// refusing node gives other errors (timeout, refused, host unreachable), which still count.
+// can be learnt from it: no route to any address (ENETUNREACH; Windows: WSAENETUNREACH), or a name
+// lookup that failed while the host has no route out. A local stub resolver (systemd-resolved at
+// 127.0.0.53, a desktop's DNS cache) stays reachable when the Wi-Fi goes, so the lookup fails with
+// "server misbehaving", "no such host" or a timeout rather than ENETUNREACH. A dead or refusing node
+// gives other errors (timeout, refused, host unreachable), which still count.
 func networkDown(err error) bool {
 	if err == nil {
 		return false
@@ -32,8 +36,33 @@ func networkDown(err error) bool {
 
 	// Errors that cross an RPC or HTTP client often arrive flattened to text.
 	msg := err.Error()
+	if strings.Contains(msg, "network is unreachable") || strings.Contains(msg, "unreachable network") {
+		return true
+	}
 
-	return strings.Contains(msg, "network is unreachable") || strings.Contains(msg, "unreachable network")
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) || strings.Contains(msg, "lookup ") {
+		return !hasRouteOut()
+	}
+
+	return false
+}
+
+// hasRouteOut reports whether the host has a route to the internet, IPv4 or IPv6. Connecting a UDP
+// socket sends nothing; the kernel only looks the destination up in its routing table and answers
+// ENETUNREACH when there is no route. The addresses are documentation ranges (RFC 5737, RFC 3849).
+//
+//nolint:gochecknoglobals // tests replace it
+var hasRouteOut = func() bool {
+	for _, target := range []string{"192.0.2.1:9", "[2001:db8::1]:9"} {
+		if c, err := net.Dial("udp", target); err == nil {
+			_ = c.Close()
+
+			return true
+		}
+	}
+
+	return false
 }
 
 // redialPolicy decides when a lost session is dialled again and when the daemon gives up.
@@ -79,6 +108,12 @@ func (p redialPolicy) run(ctx context.Context, wake <-chan struct{}, try func(at
 		delay     = p.backoff
 		down      bool
 	)
+
+	// A wake from before this redial (the network changed while the session was up) is stale.
+	select {
+	case <-wake:
+	default:
+	}
 
 	for attempt := uint(1); attempt <= p.attempts; {
 		var w <-chan struct{}

@@ -121,8 +121,7 @@ func TestRedial_WakeEndsTheNetworkWait(t *testing.T) {
 	}
 }
 
-func TestNetworkDown(t *testing.T) {
-	t.Parallel()
+func TestNetworkDown(t *testing.T) { //nolint:paralleltest // replaces hasRouteOut
 
 	require.True(t, networkDown(noNetwork()))
 	require.True(t, networkDown(errors.New(`Post "https://api.devnet.solana.com": dial tcp 208.115.212.49:443: connect: network is unreachable`)))
@@ -157,4 +156,63 @@ func TestRedial_EachOutageGetsItsOwnWait(t *testing.T) {
 
 	require.True(t, ok, "the second outage was waited for as well")
 	require.Equal(t, 102, tries)
+}
+
+// FWX review: a desktop's local resolver stays up when the Wi-Fi goes, so the redial sees a lookup
+// error, not ENETUNREACH. It counts as no network only while the host has no route out.
+func TestNetworkDown_LookupFailsWithoutARoute(t *testing.T) { //nolint:paralleltest // replaces hasRouteOut
+	route := true
+	prev := hasRouteOut
+	hasRouteOut = func() bool { return route }
+	t.Cleanup(func() { hasRouteOut = prev })
+
+	lookups := []error{
+		fmt.Errorf("fetching node account: %w", &net.DNSError{Err: "server misbehaving", Name: "api.devnet.solana.com", Server: "127.0.0.53:53", IsTemporary: true}),
+		&net.DNSError{Err: "no such host", Name: "api.devnet.solana.com", IsNotFound: true},
+		errors.New(`Post "https://api.devnet.solana.com": dial tcp: lookup api.devnet.solana.com: Temporary failure in name resolution`),
+	}
+
+	for _, err := range lookups {
+		route = false
+		require.True(t, networkDown(err), "no route: %v", err)
+
+		route = true
+		require.False(t, networkDown(err), "a lookup failure with a route out still counts: %v", err)
+	}
+}
+
+// A wake left from before the redial does not end its first network wait.
+func TestRedial_StaleWakeIsDropped(t *testing.T) {
+	t.Parallel()
+
+	wake := make(chan struct{}, 1)
+	wake <- struct{}{} // the network changed while the session was still up
+
+	p, _ := fakeRedial(3)
+	waited := 0
+	p.sleep = func(_ context.Context, _ time.Duration, w <-chan struct{}) bool {
+		if w != nil {
+			select {
+			case <-w:
+				t.Fatal("a stale wake ended the network wait")
+			default:
+			}
+		}
+		waited++
+
+		return true
+	}
+
+	tries := 0
+	ok := p.run(context.Background(), wake, func(uint, bool) error {
+		tries++
+		if tries < 3 {
+			return noNetwork()
+		}
+
+		return nil
+	})
+
+	require.True(t, ok)
+	require.Equal(t, 3, waited)
 }
