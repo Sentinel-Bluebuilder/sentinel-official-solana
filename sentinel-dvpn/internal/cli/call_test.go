@@ -261,7 +261,7 @@ func TestWrapCallError(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := cli.WrapCallError("node", instance.Tag("c0"), "/tmp/daemon.sock", tc.err, func() (map[string]bool, error) { return nil, nil })
+			got := cli.WrapCallError("node", instance.Tag("c0"), "/tmp/daemon.sock", tc.err, func() (map[string]bool, error) { return nil, nil }, func() string { return "" })
 			require.EqualError(t, got, tc.want)
 		})
 	}
@@ -273,6 +273,32 @@ func TestWrapCallError_LeftoverTunnel(t *testing.T) {
 	transportErr := status.Error(codes.Unavailable, `connection error: desc = "transport: Error while dialing: dial unix /tmp/daemon.sock: connect: no such file or directory"`)
 	up := func() (map[string]bool, error) { return map[string]bool{"dvpn-c0": true}, nil }
 
-	got := cli.WrapCallError("node", instance.Tag("c0"), "/tmp/daemon.sock", transportErr, up)
+	got := cli.WrapCallError("node", instance.Tag("c0"), "/tmp/daemon.sock", transportErr, up, func() string { return "" })
 	require.EqualError(t, got, "the node service (instance c0) isn't running, but a tunnel it started (dvpn-c0) is still up; start the service to recover and remove it: `sentinel-dvpnd service start --instance c0` (or run `sentinel-dvpnd run --instance c0` in a terminal) (/tmp/daemon.sock): rpc error: code = Unavailable desc = connection error: desc = \"transport: Error while dialing: dial unix /tmp/daemon.sock: connect: no such file or directory\"")
+}
+
+func TestWrapCallError_LeftoverTunnel_LiveName(t *testing.T) {
+	t.Parallel()
+
+	transportErr := status.Error(codes.Unavailable, `connection error: desc = "transport: Error while dialing: dial unix /tmp/daemon.sock: connect: no such file or directory"`)
+	// The daemon recorded a kernel-assigned name (a macOS utun) that is NOT dvpn-c0; only reading
+	// the recorded live name lets the warning name it. ifaces reports that interface present.
+	up := func() (map[string]bool, error) { return map[string]bool{"utun7": true}, nil }
+	live := func() string { return "utun7" }
+
+	got := cli.WrapCallError("node", instance.Tag("c0"), "/tmp/daemon.sock", transportErr, up, live)
+	require.EqualError(t, got, "the node service (instance c0) isn't running, but a tunnel it started (utun7) is still up; start the service to recover and remove it: `sentinel-dvpnd service start --instance c0` (or run `sentinel-dvpnd run --instance c0` in a terminal) (/tmp/daemon.sock): rpc error: code = Unavailable desc = connection error: desc = \"transport: Error while dialing: dial unix /tmp/daemon.sock: connect: no such file or directory\"")
+}
+
+func TestWrapCallError_LeftoverTunnel_StaleGone(t *testing.T) {
+	t.Parallel()
+
+	transportErr := status.Error(codes.Unavailable, `connection error: desc = "transport: Error while dialing: dial unix /tmp/daemon.sock: connect: no such file or directory"`)
+	// The marker names utun7, but the interface is already gone (ifaces does not report it). A stale
+	// marker must NOT produce a warning — the user gets the plain "isn't running" message.
+	up := func() (map[string]bool, error) { return map[string]bool{}, nil }
+	live := func() string { return "utun7" }
+
+	got := cli.WrapCallError("node", instance.Tag("c0"), "/tmp/daemon.sock", transportErr, up, live)
+	require.EqualError(t, got, "the node service (instance c0) isn't running: start it with `sentinel-dvpnd service start --instance c0` (or run `sentinel-dvpnd run --instance c0` in a terminal) (/tmp/daemon.sock): rpc error: code = Unavailable desc = connection error: desc = \"transport: Error while dialing: dial unix /tmp/daemon.sock: connect: no such file or directory\"")
 }

@@ -158,6 +158,12 @@ func ToSendResult(receipt *tx.Receipt) any {
 	return toSendResult(receipt)
 }
 
-func WrapCallError(role string, tag instance.Tag, endpoint string, err error, ifaces func() (map[string]bool, error)) error {
-	return wrapCallError(role, tag, endpoint, err, ifaces)
+func WrapCallError(role string, tag instance.Tag, endpoint string, err error, ifaces func() (map[string]bool, error), liveIface func() string) error {
+	return wrapCallError(role, tag, endpoint, err, ifaces, liveIface)
+}
+
+func DialerTunnelIface(stateRoot string, tag instance.Tag) string {
+	daemon := &dialer{stateRoot: stateRoot}
+
+	return daemon.tunnelIface(tag)
 }

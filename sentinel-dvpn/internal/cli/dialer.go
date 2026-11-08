@@ -3,8 +3,11 @@ package cli
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"runtime"
 	"slices"
+	"strings"
 	"time"
 
 	"google.golang.org/grpc"
@@ -56,4 +59,26 @@ func (d *dialer) endpointFor(tag instance.Tag) string {
 	}
 
 	return tag.Endpoint(runtime.GOOS)
+}
+
+// tunnelIface reads the live tunnel interface name the daemon recorded for tag in its instance
+// state dir while a session is up. It names a leftover tunnel when the daemon is unreachable. An
+// empty string means unknown — no record, a read error, or a custom endpoint whose state dir we do
+// not resolve — and the caller falls back to the tag's default dvpn-<instance> name.
+func (d *dialer) tunnelIface(tag instance.Tag) string {
+	if d.endpoint != "" {
+		return ""
+	}
+
+	root := d.stateRoot
+	if root == "" {
+		root = instance.StateRoot(runtime.GOOS)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(root, string(tag), instance.TunnelIfaceFileName))
+	if err != nil {
+		return ""
+	}
+
+	return strings.TrimSpace(string(raw))
 }

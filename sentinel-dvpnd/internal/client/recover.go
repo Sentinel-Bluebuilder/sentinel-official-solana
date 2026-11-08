@@ -60,6 +60,8 @@ func (r *Runtime) Recover(ctx context.Context) error {
 		return fmt.Errorf("%w: %w", ErrServiceCleanupFailed, err)
 	}
 
+	removeTunnelIface(r.dir, r.log)
+
 	if err := r.dnsBackend.Cleanup(cctx); err != nil {
 		return fmt.Errorf("%w: %w", ErrDNSCleanupFailed, err)
 	}

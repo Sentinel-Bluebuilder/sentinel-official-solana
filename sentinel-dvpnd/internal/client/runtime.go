@@ -39,6 +39,7 @@ type Runtime struct {
 	cfg                    *config.Client
 	connection             *connection
 	db                     *gorm.DB
+	dir                    string
 	dnsBackend             dnsBackend
 	dnsIface               string
 	firewallBackend        firewallBackend
@@ -193,6 +194,7 @@ func New(
 		callTimeout:            callTimeout,
 		cfg:                    loaded.Client,
 		db:                     db,
+		dir:                    loaded.Dir,
 		dnsBackend:             newDNSBackend(loaded.Client.Network.DNSBackend, loaded.Dir),
 		firewallBackend:        newFirewall(loaded.Dir, loaded.Tag.ObjectName()),
 		iface:                  loaded.Tag.Interface(),
