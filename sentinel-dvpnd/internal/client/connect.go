@@ -644,7 +644,18 @@ func (r *Runtime) startTunnel(
 
 	setTunnelIPv6(conn.service, r.cfg.Network.KillSwitch, hosts.addrs)
 
-	if err := r.startService(lifecycle, conn, endpoint.String(), opened.Peer); err != nil {
+	// A protocol that runs as a child process lives as long as the context it starts with. A stop cancels the
+	// session context before teardown, which still takes the final usage sample and then stops the service
+	// itself, so the service context follows the session context only while the service is starting.
+	serviceCtx, cancelService := context.WithCancel(context.WithoutCancel(lifecycle))
+	followSession := context.AfterFunc(lifecycle, cancelService)
+
+	err = r.startService(serviceCtx, conn, endpoint.String(), opened.Peer)
+	followSession()
+
+	if err != nil {
+		cancelService()
+
 		return nil, allowlist{}, err
 	}
 
