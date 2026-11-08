@@ -4,9 +4,11 @@ package node_test
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"testing"
 
+	"github.com/solana-foundation/solana-go/v2"
 	"github.com/solana-foundation/solana-go/v2/rpc/jsonrpc"
 	"github.com/stretchr/testify/require"
 
@@ -66,7 +68,10 @@ func TestHandler_GetLease_AccountGoneIsNotRetriedAsBusy(t *testing.T) {
 func TestChainUnavailable_JSONRPCRateLimitCode(t *testing.T) {
 	t.Parallel()
 
-	require.True(t, node.ChainUnavailable(&jsonrpc.RPCError{Code: -32429, Message: "rpc-gate: global rate limit"}))
+	limited := &jsonrpc.RPCError{Code: -32429, Message: "rate limited"}
+	require.True(t, node.ChainUnavailable(limited))
+	require.True(t, node.ChainUnavailable(fmt.Errorf("fetching channel %s: %w", solana.PublicKey{7}, limited)),
+		"as the account read returns it, wrapped")
 	require.True(t, node.ChainUnavailable(&jsonrpc.RPCError{Code: 429, Message: "Too many requests"}))
 	require.False(t, node.ChainUnavailable(&jsonrpc.RPCError{Code: -32602, Message: "invalid params"}),
 		"a definite error is not a rate limit")
