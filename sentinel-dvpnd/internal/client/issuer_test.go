@@ -700,3 +700,66 @@ func TestRuntime_Reconnect_ListShowsTheRedialAsReconnecting(t *testing.T) {
 	}
 	require.Equal(t, client.SessionStatusReconnecting, status, "the list must agree with status during a redial")
 }
+
+// A start that replaces a redial must not set up its session until the old one is torn down: that teardown reverts
+// DNS and stops the service, and run alongside the new session it would undo the new session's DNS and firewall.
+// What guarantees it is the turn queue: runSession keeps the first start's turn through supervise, and so through
+// the redial and its teardown, and the next start's connect waits for that turn.
+func TestRuntime_Reconnect_StartWaitsForTheRedialTeardown(t *testing.T) {
+	t.Parallel()
+
+	rt, home, _ := newIssuerFixture(t, 100_000, true)
+	client.SetTiming(rt, time.Hour, 50*time.Millisecond, 3, 2*time.Second)
+	home.Loaded.Client.NodeTimeoutSeconds = 1
+	row := startIssuer(t, rt, home)
+
+	entered, release := home.NodeService.HoldClose()
+	t.Cleanup(release)
+	home.NodeService.SetGetSessionErr(api.ErrInternal, 1_000_000)
+
+	select {
+	case <-entered: // the redial published its placeholder and its teardown is closing the old session
+	case <-time.After(10 * time.Second):
+		t.Fatal("the redial never closed the old session")
+	}
+	home.NodeService.SetGetSessionErr(nil, 0)
+
+	req := &daemonv1.StartSessionRequest{
+		Credential: &daemonv1.Credential{Kind: &daemonv1.Credential_Channel{Channel: row.ChannelAddress}},
+		Node:       home.NodeAddress.String(),
+	}
+
+	type result struct {
+		s   *client.Session
+		err error
+	}
+	done := make(chan result, 1)
+	go func() {
+		s, err := client.StartSession(t.Context(), rt, req)
+		done <- result{s, err}
+	}()
+
+	select {
+	case got := <-done:
+		t.Fatalf("the start returned (%v) while the old session's teardown was still running", got.err)
+	case <-time.After(500 * time.Millisecond):
+	}
+
+	release()
+
+	var got result
+	select {
+	case got = <-done:
+	case <-time.After(15 * time.Second):
+		t.Fatal("the start never returned after the teardown finished")
+	}
+	require.NoError(t, got.err)
+
+	var ended client.Session
+	require.NoError(t, home.DB.WithContext(t.Context()).First(&ended, "id = ?", row.ID).Error)
+	require.Equal(t, client.SessionStatusEnded, ended.Status, "the old teardown must be done before the new session starts")
+
+	current, ok := client.Current(rt)
+	require.True(t, ok)
+	require.Equal(t, got.s.ID, current.ID)
+}
