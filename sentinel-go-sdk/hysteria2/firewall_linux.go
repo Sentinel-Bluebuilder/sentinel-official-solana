@@ -163,14 +163,20 @@ type firewallMarker struct {
 
 func firewallMarkerPath(dir string) string { return filepath.Join(dir, firewallMarkerFile) }
 
-func readFirewallMarker(dir string) (firewallMarker, bool) {
+func readFirewallMarker(dir string, log zerolog.Logger) (firewallMarker, bool) {
 	b, err := os.ReadFile(firewallMarkerPath(dir))
 	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			log.Warn().Err(err).Str("file", firewallMarkerPath(dir)).Msg("reading firewall marker")
+		}
+
 		return firewallMarker{}, false
 	}
 
 	var m firewallMarker
 	if err := json.Unmarshal(b, &m); err != nil || m.Backend == "" || m.Port == 0 {
+		log.Warn().Err(err).Str("file", firewallMarkerPath(dir)).Msg("ignoring an unreadable firewall marker")
+
 		return firewallMarker{}, false
 	}
 

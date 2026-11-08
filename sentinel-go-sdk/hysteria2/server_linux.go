@@ -272,7 +272,7 @@ func (s *Server) Start(ctx context.Context) error {
 	// stop the node from serving. First clean up any opening a previous (possibly crashed) run left.
 	// Held under s.mu so a concurrent Stop cannot read s.fwBackend between the open and the assign.
 	s.mu.Lock()
-	if stale, ok := readFirewallMarker(s.placement.Dir); ok {
+	if stale, ok := readFirewallMarker(s.placement.Dir, s.log); ok {
 		if err := closeInboundUDP(ctx, s.run, stale.Backend, stale.Port, s.log); err != nil {
 			s.log.Warn().Err(err).Msg("cleaning a firewall opening left by a previous run")
 		}

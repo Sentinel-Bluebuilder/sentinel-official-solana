@@ -96,3 +96,31 @@ func TestServer_Start_CleansStaleFirewallMarker(t *testing.T) {
 		"Start must close the stale opening from the marker, calls=%v", calls)
 	require.NoError(t, s.Stop(context.Background()))
 }
+
+// A corrupt marker is ignored (and logged): Start does not try to close a bogus opening and still
+// opens the real port.
+func TestServer_Start_IgnoresCorruptMarker(t *testing.T) {
+	t.Parallel()
+
+	p := serverPlacementFixture(t)
+	require.NoError(t, os.WriteFile(filepath.Join(p.Dir, "hy2-firewall.json"), []byte("not json"), 0o600))
+
+	s := newFirewallTestServer(t, p)
+
+	var calls []string
+	hysteria2.SetServerRun(s, func(_ context.Context, name string, args ...string) ([]byte, error) {
+		calls = append(calls, name+" "+strings.Join(args, " "))
+		if name == "firewall-cmd" && len(args) == 1 && args[0] == "--state" {
+			return []byte("running\n"), nil
+		}
+
+		return nil, nil
+	})
+
+	require.NoError(t, s.Start(t.Context()))
+	require.False(t, fwHasCallPrefix(calls, "firewall-cmd --remove-port="),
+		"a corrupt marker must not trigger a stale close, calls=%v", calls)
+	require.True(t, fwHasCallPrefix(calls, "firewall-cmd --add-port="),
+		"Start must still open the real port, calls=%v", calls)
+	require.NoError(t, s.Stop(context.Background()))
+}

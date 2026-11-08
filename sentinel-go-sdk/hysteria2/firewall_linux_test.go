@@ -98,6 +98,15 @@ func TestOpenCloseInboundUDP(t *testing.T) {
 			wantClose:   "",
 		},
 		{
+			// A bare-port operator rule ("51822 ALLOW", any proto) is not our "51822/udp" rule, so the
+			// node adds (and later removes) only its own udp rule and leaves the operator's alone.
+			name:        "ufw adds its own udp rule beside an operator's bare-port rule",
+			detect:      map[string]string{"ufw status": "Status: active\n51822                      ALLOW       Anywhere\n"},
+			wantBackend: "ufw",
+			wantOpen:    "ufw allow 51822/udp",
+			wantClose:   "ufw delete allow 51822/udp",
+		},
+		{
 			name:        "no managed firewall",
 			detect:      map[string]string{},
 			wantBackend: "",
