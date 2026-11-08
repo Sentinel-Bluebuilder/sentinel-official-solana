@@ -113,10 +113,16 @@ func (r *Runtime) positionForRequest(ctx context.Context, kind string, address s
 	return nil, fmt.Errorf("%w: %w", api.ErrChainBusy, err)
 }
 
-// chainUnavailable: a Solana RPC rate limit or server error (JSON-RPC or HTTP 429/5xx).
+// rpcRateLimitCode is the JSON-RPC error code that RPC providers and gateways answer a rate limit
+// with inside an HTTP 200 reply (it is not the HTTP 429 a public RPC sends).
+const rpcRateLimitCode = -32429
+
+// chainUnavailable: a Solana RPC rate limit or server error (JSON-RPC or HTTP 429/5xx, or JSON-RPC
+// -32429).
 func chainUnavailable(err error) bool {
 	if rpcErr, ok := errors.AsType[*jsonrpc.RPCError](err); ok {
-		return rpcErr.Code == http.StatusTooManyRequests || rpcErr.Code >= http.StatusInternalServerError
+		return rpcErr.Code == http.StatusTooManyRequests || rpcErr.Code == rpcRateLimitCode ||
+			rpcErr.Code >= http.StatusInternalServerError
 	}
 
 	if httpErr, ok := errors.AsType[*jsonrpc.HTTPError](err); ok {

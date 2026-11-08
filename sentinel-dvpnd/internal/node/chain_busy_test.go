@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/solana-foundation/solana-go/v2/rpc/jsonrpc"
 	"github.com/stretchr/testify/require"
 
 	"github.com/sentinel-official/sentinel-dvpnd/internal/node"
@@ -58,4 +59,15 @@ func TestHandler_GetLease_AccountGoneIsNotRetriedAsBusy(t *testing.T) {
 
 	_, err := node.NewHandler(r).GetLease(newSignedContext(t, home.OwnerAddress), nodeapi.GetLeaseRequestObject{Lease: [32]byte{56}})
 	require.ErrorIs(t, err, api.ErrChannelNotOpen, "a definite answer stays as it is")
+}
+
+// An RPC gateway answers a rate limit as a JSON-RPC error -32429 inside an HTTP 200, not as an HTTP
+// 429. It is the same "chain unavailable" and must be retried, not answered as an internal error.
+func TestChainUnavailable_JSONRPCRateLimitCode(t *testing.T) {
+	t.Parallel()
+
+	require.True(t, node.ChainUnavailable(&jsonrpc.RPCError{Code: -32429, Message: "rpc-gate: global rate limit"}))
+	require.True(t, node.ChainUnavailable(&jsonrpc.RPCError{Code: 429, Message: "Too many requests"}))
+	require.False(t, node.ChainUnavailable(&jsonrpc.RPCError{Code: -32602, Message: "invalid params"}),
+		"a definite error is not a rate limit")
 }
