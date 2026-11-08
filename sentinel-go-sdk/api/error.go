@@ -8,12 +8,16 @@ import (
 	"io"
 	"net/http"
 	"slices"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/sentinel-official/sentinel-go-sdk/v3/auth"
 	"github.com/sentinel-official/sentinel-programs/clients/go/core"
 )
+
+// defaultRetryAfterSeconds is the Retry-After sent with a 429 that did not set its own.
+const defaultRetryAfterSeconds = 2
 
 const (
 	CodeBadRequest              = "bad_request"
@@ -190,6 +194,12 @@ func Abort(ginCtx *gin.Context, err error) {
 	apiErr := classify(err)
 	if apiErr == ErrInternal && err != nil {
 		_ = ginCtx.Error(err)
+	}
+
+	// The API spec requires Retry-After on every 429, and a validating client rejects a 429 without it.
+	// The rate limiter sets its own value; any other 429 (a busy chain read) gets the default.
+	if apiErr.HTTPStatus == http.StatusTooManyRequests && ginCtx.Writer.Header().Get(retryAfterHeader) == "" {
+		ginCtx.Header(retryAfterHeader, strconv.Itoa(defaultRetryAfterSeconds))
 	}
 
 	body := ErrorResponse{Error: *apiErr}

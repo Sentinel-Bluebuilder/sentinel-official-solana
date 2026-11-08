@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -43,6 +44,28 @@ func TestAbort(t *testing.T) {
 		require.Equal(t, tc.status, recorder.Code, tc.code)
 		require.Contains(t, recorder.Body.String(), `"code":"`+tc.code+`"`)
 	}
+}
+
+func TestAbort_TooManyRequestsCarriesRetryAfter(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	t.Parallel()
+
+	busy := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(busy)
+	api.Abort(ctx, fmt.Errorf("fetching channel: %w", api.ErrChainBusy))
+	require.Equal(t, http.StatusTooManyRequests, busy.Code)
+	require.Equal(t, "2", busy.Header().Get("Retry-After"))
+
+	limited := httptest.NewRecorder()
+	ctx, _ = gin.CreateTestContext(limited)
+	ctx.Header("Retry-After", "7")
+	api.Abort(ctx, api.ErrRateLimited)
+	require.Equal(t, "7", limited.Header().Get("Retry-After"), "a limiter's own value is kept")
+
+	notFound := httptest.NewRecorder()
+	ctx, _ = gin.CreateTestContext(notFound)
+	api.Abort(ctx, api.ErrSessionNotFound)
+	require.Empty(t, notFound.Header().Get("Retry-After"))
 }
 
 func TestAbort_NilErrorRespondsInternal(t *testing.T) {
