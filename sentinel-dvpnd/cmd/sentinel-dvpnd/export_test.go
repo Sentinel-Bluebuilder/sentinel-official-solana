@@ -227,3 +227,9 @@ func WriteChecks(w io.Writer, format string, checks []service.PreflightCheck) er
 func WriteUserspaceDropIn(root string, tag instance.Tag, names []service.Name) error {
 	return writeUserspaceDropIn(root, tag, names)
 }
+
+func RunStartChecks(
+	ctx context.Context, wait bool, minDelay, maxDelay time.Duration, checks func(context.Context) error,
+) error {
+	return runStartChecks(ctx, wait, minDelay, maxDelay, checks, zerolog.Nop())
+}

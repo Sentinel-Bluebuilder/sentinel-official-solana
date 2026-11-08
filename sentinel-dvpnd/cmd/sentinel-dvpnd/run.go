@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
@@ -170,11 +171,49 @@ func prepareRuntime(
 		}
 	}
 
-	if _, err := preflight.Run(ctx, loaded, log, rpcClient); err != nil {
-		return err
-	}
+	// A node or provider whose RPC does not answer at start (down, or rate-limiting it) waits for it.
+	// Exiting put the daemon in a restart loop under its service manager: off-line the whole time,
+	// and adding load to the same RPC. A client still exits at once, as before.
+	wait := loaded != nil && loaded.Role != config.RoleClient
 
-	return checkWebSocket(ctx, loaded, pin)
+	return runStartChecks(ctx, wait, startRetryMinDelay, startRetryMaxDelay, func(ctx context.Context) error {
+		if _, err := preflight.Run(ctx, loaded, log, rpcClient); err != nil {
+			return err
+		}
+
+		return checkWebSocket(ctx, loaded, pin)
+	}, log)
+}
+
+const (
+	startRetryMinDelay = 2 * time.Second
+	startRetryMaxDelay = time.Minute
+)
+
+// runStartChecks runs checks; with wait it retries a preflight.ErrRPCUnreachable with back-off
+// (minDelay doubling up to maxDelay) until the checks pass, fail another way, or ctx ends.
+func runStartChecks(
+	ctx context.Context, wait bool, minDelay, maxDelay time.Duration, checks func(context.Context) error,
+	log zerolog.Logger,
+) error {
+	delay := minDelay
+
+	for {
+		err := checks(ctx)
+		if err == nil || !wait || !errors.Is(err, preflight.ErrRPCUnreachable) {
+			return err
+		}
+
+		log.Warn().Err(err).Dur("retry_in", delay).Msg("rpc unreachable at start; waiting for it")
+
+		select {
+		case <-ctx.Done():
+			return err
+		case <-time.After(delay):
+		}
+
+		delay = min(delay*2, maxDelay)
+	}
 }
 
 func runInstance(
