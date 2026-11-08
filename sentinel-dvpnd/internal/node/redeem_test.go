@@ -218,6 +218,29 @@ func TestRuntime_Redeem_RedeemsClosingBelowThreshold(t *testing.T) {
 	require.Equal(t, cumulative, position.Redeemed)
 }
 
+// "Redeem now" claims an open position below the threshold whose voucher is seconds old. The hourly
+// worker still waits for it: it batches fees.
+func TestRuntime_RedeemNow_ClaimsBelowThresholdAtOnce(t *testing.T) {
+	t.Parallel()
+
+	r, home, _ := newRuntime(t)
+	address := seedChannel(t, r, home, home.OwnerKey, dvpn.PositionModeVoucher)
+	cumulative := home.Loaded.Node.Redeem.ThresholdBaseUnits / 2
+	seedPosition(t, r, home, address, cumulative)
+	require.NoError(t, home.DB.Model(&node.Position{}).Where("address = ?", address.String()).
+		Update("accepted_unix", time.Now().Unix()).Error)
+
+	require.NoError(t, node.Redeem(t.Context(), r))
+	require.Empty(t, home.RPC.Sent(), "the worker waits: below the threshold and under an hour old")
+
+	require.NoError(t, node.RedeemNow(t.Context(), r))
+	require.Len(t, home.RPC.Sent(), 1)
+
+	var position node.Position
+	require.NoError(t, home.DB.First(&position, "address = ?", address.String()).Error)
+	require.Equal(t, cumulative, position.Redeemed)
+}
+
 func TestRuntime_Redeem_RetriesFailedBatchAsSingles(t *testing.T) {
 	t.Parallel()
 
