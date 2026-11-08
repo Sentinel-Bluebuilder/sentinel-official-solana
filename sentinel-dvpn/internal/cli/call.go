@@ -85,7 +85,7 @@ func newStreamCallCmd[C, Req, Resp any](
 
 		stream, err := open(newClient(conn), ctx, req)
 		if err != nil {
-			return wrapCallError(spec.Role, daemon.endpointFor(tag), err)
+			return wrapCallError(spec.Role, tag, daemon.endpointFor(tag), err)
 		}
 
 		for {
@@ -95,7 +95,7 @@ func newStreamCallCmd[C, Req, Resp any](
 			}
 
 			if err != nil {
-				return wrapCallError(spec.Role, daemon.endpointFor(tag), err)
+				return wrapCallError(spec.Role, tag, daemon.endpointFor(tag), err)
 			}
 
 			var result any = resp
@@ -162,7 +162,7 @@ func newUnaryCallCmd[C, Req, Resp any](
 
 		resp, err := call(newClient(conn), ctx, req)
 		if err != nil {
-			return wrapCallError(spec.Role, daemon.endpointFor(tag), err)
+			return wrapCallError(spec.Role, tag, daemon.endpointFor(tag), err)
 		}
 
 		if spec.Render != nil {
@@ -187,7 +187,7 @@ func newUnaryCallCmd[C, Req, Resp any](
 	return cmd
 }
 
-func wrapCallError(role, endpoint string, err error) error {
+func wrapCallError(role string, tag instance.Tag, endpoint string, err error) error {
 	if role == "" {
 		role = "daemon"
 	}
@@ -196,8 +196,11 @@ func wrapCallError(role, endpoint string, err error) error {
 		return fmt.Errorf("%s %w: %w", role, errRoleNotServed, err)
 	}
 
+	// A stopped daemon surfaces as Unavailable: say so plainly and how to start it, keeping the endpoint
+	// and wrapping the raw error with %w so -v / json still carry the gRPC detail.
 	if status.Code(err) == codes.Unavailable {
-		return fmt.Errorf("calling daemon at %s: %w", endpoint, err)
+		return fmt.Errorf("the %s service (instance %s) isn't running: start it with `sentinel-dvpnd run --instance %s` (%s): %w",
+			role, tag, tag, endpoint, err)
 	}
 
 	return fmt.Errorf("calling daemon: %w", err)
