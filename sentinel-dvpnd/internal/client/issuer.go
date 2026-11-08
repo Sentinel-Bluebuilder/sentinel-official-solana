@@ -269,10 +269,16 @@ func (r *Runtime) reconnect(
 		return nil, false
 	}
 
-	if r.cfg.Network.KillSwitch != config.KillSwitchPersist {
+	// Q0353/I#27: a kill switch of "on" (or "persist") must FAIL CLOSED when reconnecting gives up —
+	// releasing it here left traffic going direct to the open internet while the tunnel was down (proven
+	// live: cut90_ks leaked real handshakes + inbound data on every protocol). Only "off" lifts the
+	// reconnect hold; "on"/"persist" keep blocking until the user disconnects.
+	if r.cfg.Network.KillSwitch == config.KillSwitchOff {
 		if _, err := r.releaseFirewall(ctx, false); err != nil {
 			r.log.Error().Err(err).Msg("releasing the kill switch after exhausted reconnects; StopSession retries it")
 		}
+	} else {
+		r.log.Warn().Str("kill_switch", r.cfg.Network.KillSwitch).Msg("reconnecting gave up: the kill switch is still blocking the internet; reconnect, or disconnect to restore normal internet")
 	}
 
 	r.log.Error().Msg("reconnect attempts exhausted")
