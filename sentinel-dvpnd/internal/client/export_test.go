@@ -200,6 +200,7 @@ func StopSession(ctx context.Context, r *Runtime) error {
 func VerifyLedger(r *Runtime, ch *Channel, view nodeapi.Position, terms session.Terms, settledBound uint64) error {
 	return r.verifyLedger(ch, view, terms, settledBound)
 }
+
 func CurrentSession(r *Runtime) (*Session, bool) { return r.current() }
 
 func GRPCGetSession(ctx context.Context, r *Runtime, id string) (*daemonv1.Session, error) {
@@ -216,4 +217,12 @@ func GRPCStopSession(ctx context.Context, r *Runtime, id string) error {
 	_, err := (&grpcServer{runtime: r}).StopSession(ctx, &daemonv1.StopSessionRequest{Id: id})
 
 	return err
+}
+
+// SetWallClockOffset shifts the issue loop's wall clock by d (a system time change), leaving the
+// monotonic clock alone.
+func SetWallClockOffset(t interface{ Cleanup(func()) }, d time.Duration) {
+	wallOffset.Store(int64(d))
+
+	t.Cleanup(func() { wallOffset.Store(0) })
 }
