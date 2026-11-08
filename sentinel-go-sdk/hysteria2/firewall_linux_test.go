@@ -5,6 +5,7 @@ package hysteria2_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -13,12 +14,13 @@ import (
 	"github.com/sentinel-official/sentinel-go-sdk/v3/hysteria2"
 )
 
-// fakeFirewall records every command and answers the detection probes from a script, so the test
-// drives the backend selection without a real firewall.
+// fakeFirewall records every action command and answers the detection/ownership probes from a
+// script, so the test drives backend selection and the "already open" check without a real firewall.
 type fakeFirewall struct {
 	calls []string
-	// detect maps a probe ("firewall-cmd --state", "ufw status", "nft --version") to its output;
-	// a probe absent from the map errors (as a missing tool would).
+	// detect maps a probe to its stdout. Known probes: "firewall-cmd --state",
+	// "firewall-cmd --query-port=<p>/udp", "ufw status". A probe absent from the map errors, as a
+	// not-running firewall / closed port would.
 	detect map[string]string
 }
 
@@ -28,7 +30,6 @@ func (f *fakeFirewall) run(_ context.Context, name string, args ...string) ([]by
 		line += " " + a
 	}
 
-	// Detection probes answer from the script; everything else is an action we record as succeeding.
 	switch {
 	case name == "firewall-cmd" && len(args) == 1 && args[0] == "--state":
 		if out, ok := f.detect["firewall-cmd --state"]; ok {
@@ -36,18 +37,18 @@ func (f *fakeFirewall) run(_ context.Context, name string, args ...string) ([]by
 		}
 
 		return nil, errors.New("not running")
+	case name == "firewall-cmd" && len(args) == 1 && strings.HasPrefix(args[0], "--query-port="):
+		if out, ok := f.detect[line]; ok {
+			return []byte(out), nil
+		}
+
+		return nil, errors.New("not open") // --query-port exits non-zero when the port is not open
 	case name == "ufw" && len(args) == 1 && args[0] == "status":
 		if out, ok := f.detect["ufw status"]; ok {
 			return []byte(out), nil
 		}
 
 		return nil, errors.New("inactive")
-	case name == "nft" && len(args) == 1 && args[0] == "--version":
-		if _, ok := f.detect["nft --version"]; ok {
-			return []byte("nftables v1.0"), nil
-		}
-
-		return nil, errors.New("no nft")
 	}
 
 	f.calls = append(f.calls, line)
@@ -68,28 +69,36 @@ func TestOpenCloseInboundUDP(t *testing.T) {
 		wantClose   string
 	}{
 		{
-			name:        "firewalld running",
+			name:        "firewalld opens when not already open",
 			detect:      map[string]string{"firewall-cmd --state": "running\n"},
 			wantBackend: "firewalld",
 			wantOpen:    "firewall-cmd --add-port=51822/udp",
 			wantClose:   "firewall-cmd --remove-port=51822/udp",
 		},
 		{
-			name:        "ufw active",
+			// Already open (operator's rule, or permanent/in a zone): own nothing, so Stop touches nothing.
+			name:        "firewalld leaves an already-open port",
+			detect:      map[string]string{"firewall-cmd --state": "running\n", "firewall-cmd --query-port=51822/udp": "yes\n"},
+			wantBackend: "",
+			wantOpen:    "",
+			wantClose:   "",
+		},
+		{
+			name:        "ufw opens when not already open",
 			detect:      map[string]string{"ufw status": "Status: active\n"},
 			wantBackend: "ufw",
 			wantOpen:    "ufw allow 51822/udp",
 			wantClose:   "ufw delete allow 51822/udp",
 		},
 		{
-			name:        "nft fallback",
-			detect:      map[string]string{"nft --version": "yes"},
-			wantBackend: "nft",
-			wantOpen:    "nft add rule inet sentinel-dvpn-hy2-51822 input udp dport 51822 accept",
-			wantClose:   "nft delete table inet sentinel-dvpn-hy2-51822",
+			name:        "ufw leaves an already-open port",
+			detect:      map[string]string{"ufw status": "Status: active\n51822/udp                   ALLOW       Anywhere\n"},
+			wantBackend: "",
+			wantOpen:    "",
+			wantClose:   "",
 		},
 		{
-			name:        "no firewall",
+			name:        "no managed firewall",
 			detect:      map[string]string{},
 			wantBackend: "",
 			wantOpen:    "",
@@ -108,7 +117,7 @@ func TestOpenCloseInboundUDP(t *testing.T) {
 			require.Equal(t, tc.wantBackend, backend)
 
 			if tc.wantOpen == "" {
-				require.Empty(t, fw.calls, "no managed firewall: must issue no open command")
+				require.Empty(t, fw.calls, "no opening to make: must issue no add command")
 			} else {
 				require.Contains(t, fw.calls, tc.wantOpen)
 			}
@@ -118,7 +127,7 @@ func TestOpenCloseInboundUDP(t *testing.T) {
 			require.NoError(t, hysteria2.CloseInboundUDPForTest(context.Background(), fw.run, backend, port, zerolog.Nop()))
 
 			if tc.wantClose == "" {
-				require.Empty(t, fw.calls, "nothing opened: must issue no close command")
+				require.Empty(t, fw.calls, "nothing opened by us: must issue no close command")
 			} else {
 				require.Contains(t, fw.calls, tc.wantClose)
 			}

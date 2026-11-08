@@ -4,9 +4,12 @@ package hysteria2
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -14,19 +17,27 @@ import (
 )
 
 // A Linux node that runs a host firewall (firewalld or ufw) drops inbound UDP to the hysteria2
-// listen port unless the port is opened, so clients cannot connect until an operator opens it by
-// hand. The node opens its own port when it starts and removes the opening when it stops.
+// listen port unless the port is opened. The node opens its own port on Start and removes that
+// opening on Stop — but only an opening it made itself. If the port is already open (an operator
+// opened it, or it is permanent / in a zone), the node leaves it alone so Stop never deletes
+// someone else's rule.
 //
-// The rules are runtime-only (firewalld without --permanent, ufw's live table, our own nft table):
-// they are torn down on Stop and would in any case not survive a reboot, matching the daemon's own
-// lifetime. nft is the fallback for a host with neither firewalld nor ufw but a default-drop input
-// policy; it uses a dedicated table so removal cannot touch anyone else's rules.
+// ufw's `allow` is written under /etc/ufw and survives a reboot, so a crash that skips Stop would
+// leave the opening behind. To bound that, the server records what it opened (backend + port) in a
+// marker file and, on the next Start, closes and clears any opening a previous run left — which
+// also cleans up after the listen port changes.
+//
+// Only firewalld and ufw are handled. On a host with neither active, the node logs that it is not
+// touching the firewall: a bare nftables `accept` in its own table cannot override a drop in
+// another base chain on the same input hook (e.g. a default-drop `inet filter` or iptables-nft
+// INPUT policy), so adding one would give false assurance without actually letting traffic in.
 
 const (
 	fwNone      = ""
 	fwFirewalld = "firewalld"
 	fwUFW       = "ufw"
-	fwNft       = "nft"
+
+	firewallMarkerFile = "hy2-firewall.json"
 )
 
 // runFunc runs a command and returns its combined output. It is a seam so tests can stub the host
@@ -37,16 +48,21 @@ func defaultRun(ctx context.Context, name string, args ...string) ([]byte, error
 	return exec.CommandContext(ctx, name, args...).CombinedOutput()
 }
 
-func nftTable(port uint16) string { return "sentinel-dvpn-hy2-" + strconv.Itoa(int(port)) }
-
-// openInboundUDP opens port/udp through the active host firewall and returns the backend it used,
-// or fwNone when no managed firewall is active and nft is unavailable. The caller passes the
-// returned backend to closeInboundUDP on Stop.
+// openInboundUDP opens port/udp through the active host firewall and returns the backend it used.
+// It returns fwNone (nothing for Stop to close) both when no managed firewall is active and when
+// the port is already open — in the latter case the opening belongs to someone else, so Stop must
+// not remove it.
 func openInboundUDP(ctx context.Context, run runFunc, port uint16, log zerolog.Logger) (string, error) {
 	p := strconv.Itoa(int(port))
 
 	switch {
 	case firewalldRunning(ctx, run):
+		if firewalldPortOpen(ctx, run, p) {
+			log.Info().Str("backend", fwFirewalld).Str("port", p).Msg("inbound udp already open; leaving it to the operator")
+
+			return fwNone, nil
+		}
+
 		if out, err := run(ctx, "firewall-cmd", "--add-port="+p+"/udp"); err != nil {
 			return fwNone, fmt.Errorf("firewalld: opening %s/udp: %w: %s", p, err, strings.TrimSpace(string(out)))
 		}
@@ -55,6 +71,12 @@ func openInboundUDP(ctx context.Context, run runFunc, port uint16, log zerolog.L
 
 		return fwFirewalld, nil
 	case ufwActive(ctx, run):
+		if ufwPortOpen(ctx, run, p) {
+			log.Info().Str("backend", fwUFW).Str("port", p).Msg("inbound udp already open; leaving it to the operator")
+
+			return fwNone, nil
+		}
+
 		if out, err := run(ctx, "ufw", "allow", p+"/udp"); err != nil {
 			return fwNone, fmt.Errorf("ufw: opening %s/udp: %w: %s", p, err, strings.TrimSpace(string(out)))
 		}
@@ -62,36 +84,15 @@ func openInboundUDP(ctx context.Context, run runFunc, port uint16, log zerolog.L
 		log.Info().Str("backend", fwUFW).Str("port", p).Msg("opened inbound udp")
 
 		return fwUFW, nil
-	case haveNft(ctx, run):
-		table := nftTable(port)
-		// Fresh dedicated table so open is idempotent and close removes only ours.
-		_, _ = run(ctx, "nft", "delete", "table", "inet", table)
-
-		stmts := [][]string{
-			{"add", "table", "inet", table},
-			{"add", "chain", "inet", table, "input", "{ type filter hook input priority -10 ; }"},
-			{"add", "rule", "inet", table, "input", "udp", "dport", p, "accept"},
-		}
-		for _, a := range stmts {
-			if out, err := run(ctx, "nft", a...); err != nil {
-				_, _ = run(ctx, "nft", "delete", "table", "inet", table)
-
-				return fwNone, fmt.Errorf("nft: opening %s/udp: %w: %s", p, err, strings.TrimSpace(string(out)))
-			}
-		}
-
-		log.Info().Str("backend", fwNft).Str("port", p).Msg("opened inbound udp")
-
-		return fwNft, nil
 	default:
-		// No managed firewall and no nft: the host is not filtering inbound, so nothing to open.
+		log.Warn().Str("port", p).Msg("no managed firewall (firewalld/ufw) active; not touching the host firewall — open " + p + "/udp yourself if you filter inbound")
+
 		return fwNone, nil
 	}
 }
 
-// closeInboundUDP removes the opening made by openInboundUDP. It is best-effort: a failure is
-// returned so Stop can surface it, but every backend's remove is harmless if the rule is already
-// gone.
+// closeInboundUDP removes an opening openInboundUDP made (backend != fwNone). fwNone means we opened
+// nothing of our own, so there is nothing to remove.
 func closeInboundUDP(ctx context.Context, run runFunc, backend string, port uint16, log zerolog.Logger) error {
 	p := strconv.Itoa(int(port))
 
@@ -103,10 +104,6 @@ func closeInboundUDP(ctx context.Context, run runFunc, backend string, port uint
 	case fwUFW:
 		if out, err := run(ctx, "ufw", "delete", "allow", p+"/udp"); err != nil {
 			return fmt.Errorf("ufw: closing %s/udp: %w: %s", p, err, strings.TrimSpace(string(out)))
-		}
-	case fwNft:
-		if out, err := run(ctx, "nft", "delete", "table", "inet", nftTable(port)); err != nil {
-			return fmt.Errorf("nft: closing %s/udp: %w: %s", p, err, strings.TrimSpace(string(out)))
 		}
 	case fwNone:
 		return nil
@@ -125,14 +122,76 @@ func firewalldRunning(ctx context.Context, run runFunc) bool {
 	return err == nil && strings.Contains(string(out), "running")
 }
 
+// firewalldPortOpen reports whether firewalld already allows port/udp. --query-port exits 0 and
+// prints "yes" when the port is open, and exits non-zero (printing "no") when it is not.
+func firewalldPortOpen(ctx context.Context, run runFunc, p string) bool {
+	out, err := run(ctx, "firewall-cmd", "--query-port="+p+"/udp")
+
+	return err == nil && strings.Contains(string(out), "yes")
+}
+
 func ufwActive(ctx context.Context, run runFunc) bool {
 	out, err := run(ctx, "ufw", "status")
 
 	return err == nil && strings.Contains(string(out), "Status: active")
 }
 
-func haveNft(ctx context.Context, run runFunc) bool {
-	_, err := run(ctx, "nft", "--version")
+// ufwPortOpen reports whether `ufw status` already lists an allow rule for exactly port/udp, so the
+// node does not add (and later remove) a rule an operator put there.
+func ufwPortOpen(ctx context.Context, run runFunc, p string) bool {
+	out, err := run(ctx, "ufw", "status")
+	if err != nil {
+		return false
+	}
 
-	return err == nil && !errors.Is(err, exec.ErrNotFound)
+	for _, line := range strings.Split(string(out), "\n") {
+		f := strings.Fields(line)
+		if len(f) >= 2 && f[0] == p+"/udp" && strings.EqualFold(f[1], "ALLOW") {
+			return true
+		}
+	}
+
+	return false
+}
+
+// firewallMarker records an opening this node made, so a later Start can undo it even if Stop never
+// ran (a crash) or the listen port changed.
+type firewallMarker struct {
+	Backend string `json:"backend"`
+	Port    uint16 `json:"port"`
+}
+
+func firewallMarkerPath(dir string) string { return filepath.Join(dir, firewallMarkerFile) }
+
+func readFirewallMarker(dir string) (firewallMarker, bool) {
+	b, err := os.ReadFile(firewallMarkerPath(dir))
+	if err != nil {
+		return firewallMarker{}, false
+	}
+
+	var m firewallMarker
+	if err := json.Unmarshal(b, &m); err != nil || m.Backend == "" || m.Port == 0 {
+		return firewallMarker{}, false
+	}
+
+	return m, true
+}
+
+func writeFirewallMarker(dir string, m firewallMarker, log zerolog.Logger) {
+	b, err := json.Marshal(m)
+	if err != nil {
+		log.Warn().Err(err).Msg("recording firewall opening")
+
+		return
+	}
+
+	if err := os.WriteFile(firewallMarkerPath(dir), b, 0o600); err != nil {
+		log.Warn().Err(err).Msg("recording firewall opening")
+	}
+}
+
+func removeFirewallMarker(dir string, log zerolog.Logger) {
+	if err := os.Remove(firewallMarkerPath(dir)); err != nil && !errors.Is(err, os.ErrNotExist) {
+		log.Warn().Err(err).Msg("clearing firewall marker")
+	}
 }

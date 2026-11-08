@@ -268,21 +268,30 @@ func (s *Server) Start(ctx context.Context) error {
 		return err
 	}
 
-	backend, err := openInboundUDP(ctx, s.run, s.cfg.ListenPort, s.log)
-	if err != nil {
-		stopCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), service.FailedStartStopTimeout)
-		defer cancel()
-
-		_ = s.process.Terminate(stopCtx)
-
-		if shutdownErr := s.authServer.Shutdown(stopCtx); shutdownErr != nil {
-			err = errors.Join(err, fmt.Errorf("stopping auth server: %w", shutdownErr))
+	// Open the listen port in the host firewall. Best-effort: a firewall we cannot drive must not
+	// stop the node from serving. First clean up any opening a previous (possibly crashed) run left.
+	// Held under s.mu so a concurrent Stop cannot read s.fwBackend between the open and the assign.
+	s.mu.Lock()
+	if stale, ok := readFirewallMarker(s.placement.Dir); ok {
+		if err := closeInboundUDP(ctx, s.run, stale.Backend, stale.Port, s.log); err != nil {
+			s.log.Warn().Err(err).Msg("cleaning a firewall opening left by a previous run")
 		}
 
-		return err
+		removeFirewallMarker(s.placement.Dir, s.log)
+	}
+
+	backend, fwErr := openInboundUDP(ctx, s.run, s.cfg.ListenPort, s.log)
+	if fwErr != nil {
+		s.log.Warn().Err(fwErr).Msg("opening inbound udp in the host firewall; serving anyway — open it yourself if clients cannot connect")
+
+		backend = fwNone
 	}
 
 	s.fwBackend = backend
+	if backend != fwNone {
+		writeFirewallMarker(s.placement.Dir, firewallMarker{Backend: backend, Port: s.cfg.ListenPort}, s.log)
+	}
+	s.mu.Unlock()
 
 	succeeded = true
 
@@ -305,13 +314,17 @@ func (s *Server) Stop(ctx context.Context) error {
 			errs = append(errs, err)
 		}
 
+		s.mu.Lock()
 		if s.fwBackend != "" {
 			if err := closeInboundUDP(ctx, s.run, s.fwBackend, s.cfg.ListenPort, s.log); err != nil {
 				errs = append(errs, err)
 			} else {
 				s.fwBackend = ""
+
+				removeFirewallMarker(s.placement.Dir, s.log)
 			}
 		}
+		s.mu.Unlock()
 
 		if err := s.authServer.Shutdown(ctx); err != nil {
 			errs = append(errs, fmt.Errorf("stopping auth server: %w", err))
