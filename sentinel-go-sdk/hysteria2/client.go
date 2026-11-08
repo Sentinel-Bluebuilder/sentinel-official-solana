@@ -204,6 +204,8 @@ type clientTemplateData struct {
 	ExcludeV4    string
 	ExcludeV6    string
 	Interface    string
+	LocalV4      []string
+	LocalV6      []string
 	ObfsPassword string
 	TLSPin       string
 }
@@ -231,6 +233,13 @@ func resolveHost(ctx context.Context, host string) (netip.Addr, error) {
 }
 
 func writeConf(path string, addr netip.Addr, iface string, resp PeerResponse) error {
+	// The machine's own networks stay off the tunnel, as WireGuard's suppress_prefixlength 0 keeps
+	// them: without this the TUN takes the LAN, and allow_lan (a firewall rule) cannot reach it.
+	return writeConfWith(path, addr, iface, resp, localBypassV4(iface), localBypassV6(iface))
+}
+
+// writeConfWith renders the client config with the given local ranges excluded from the tunnel.
+func writeConfWith(path string, addr netip.Addr, iface string, resp PeerResponse, localV4, localV6 []string) error {
 	data := clientTemplateData{
 		Auth:         resp.Auth,
 		Endpoint:     net.JoinHostPort(addr.String(), strconv.Itoa(int(resp.Port))),
@@ -245,6 +254,9 @@ func writeConf(path string, addr netip.Addr, iface string, resp PeerResponse) er
 	} else {
 		data.ExcludeV6 = exclude
 	}
+
+	data.LocalV4 = localV4
+	data.LocalV6 = localV6
 
 	return service.WriteTemplate(templates, clientTemplate, path, data, "#")
 }
