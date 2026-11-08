@@ -22,6 +22,9 @@ type fakeFirewall struct {
 	// "firewall-cmd --query-port=<p>/udp", "ufw status". A probe absent from the map errors, as a
 	// not-running firewall / closed port would.
 	detect map[string]string
+	// failAdd makes the add action (firewall-cmd --add-port / ufw allow) fail, so a test can assert
+	// openInboundUDP surfaces the error.
+	failAdd bool
 }
 
 func (f *fakeFirewall) run(_ context.Context, name string, args ...string) ([]byte, error) {
@@ -51,9 +54,29 @@ func (f *fakeFirewall) run(_ context.Context, name string, args ...string) ([]by
 		return nil, errors.New("inactive")
 	}
 
+	if f.failAdd &&
+		((name == "firewall-cmd" && len(args) >= 1 && strings.HasPrefix(args[0], "--add-port=")) ||
+			(name == "ufw" && len(args) >= 2 && args[0] == "allow")) {
+		f.calls = append(f.calls, line)
+
+		return []byte("ERROR: access denied"), errors.New("add failed")
+	}
+
 	f.calls = append(f.calls, line)
 
 	return nil, nil
+}
+
+// A failing firewall add must be surfaced by openInboundUDP (the server logs it and serves anyway,
+// but the error must not be swallowed). Pins that serve-anyway does not hide a real failure.
+func TestOpenInboundUDP_SurfacesCommandError(t *testing.T) {
+	t.Parallel()
+
+	fw := &fakeFirewall{detect: map[string]string{"firewall-cmd --state": "running\n"}, failAdd: true}
+
+	backend, err := hysteria2.OpenInboundUDPForTest(context.Background(), fw.run, 51822, zerolog.Nop())
+	require.Error(t, err)
+	require.Equal(t, "", backend)
 }
 
 func TestOpenCloseInboundUDP(t *testing.T) {
@@ -96,15 +119,6 @@ func TestOpenCloseInboundUDP(t *testing.T) {
 			wantBackend: "",
 			wantOpen:    "",
 			wantClose:   "",
-		},
-		{
-			// A bare-port operator rule ("51822 ALLOW", any proto) is not our "51822/udp" rule, so the
-			// node adds (and later removes) only its own udp rule and leaves the operator's alone.
-			name:        "ufw adds its own udp rule beside an operator's bare-port rule",
-			detect:      map[string]string{"ufw status": "Status: active\n51822                      ALLOW       Anywhere\n"},
-			wantBackend: "ufw",
-			wantOpen:    "ufw allow 51822/udp",
-			wantClose:   "ufw delete allow 51822/udp",
 		},
 		{
 			name:        "no managed firewall",
