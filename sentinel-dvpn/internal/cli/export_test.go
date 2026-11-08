@@ -158,6 +158,6 @@ func ToSendResult(receipt *tx.Receipt) any {
 	return toSendResult(receipt)
 }
 
-func WrapCallError(role string, tag instance.Tag, endpoint string, err error) error {
-	return wrapCallError(role, tag, endpoint, err)
+func WrapCallError(role string, tag instance.Tag, endpoint string, err error, ifaces func() (map[string]bool, error)) error {
+	return wrapCallError(role, tag, endpoint, err, ifaces)
 }

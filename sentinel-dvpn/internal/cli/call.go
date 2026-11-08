@@ -15,6 +15,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/sentinel-official/sentinel-go-sdk/v3/daemon/instance"
+	"github.com/sentinel-official/sentinel-go-sdk/v3/service"
 )
 
 const (
@@ -86,7 +87,7 @@ func newStreamCallCmd[C, Req, Resp any](
 
 		stream, err := open(newClient(conn), ctx, req)
 		if err != nil {
-			return wrapCallError(spec.Role, tag, daemon.endpointFor(tag), err)
+			return wrapCallError(spec.Role, tag, daemon.endpointFor(tag), err, service.InterfaceNames)
 		}
 
 		for {
@@ -96,7 +97,7 @@ func newStreamCallCmd[C, Req, Resp any](
 			}
 
 			if err != nil {
-				return wrapCallError(spec.Role, tag, daemon.endpointFor(tag), err)
+				return wrapCallError(spec.Role, tag, daemon.endpointFor(tag), err, service.InterfaceNames)
 			}
 
 			var result any = resp
@@ -163,7 +164,7 @@ func newUnaryCallCmd[C, Req, Resp any](
 
 		resp, err := call(newClient(conn), ctx, req)
 		if err != nil {
-			return wrapCallError(spec.Role, tag, daemon.endpointFor(tag), err)
+			return wrapCallError(spec.Role, tag, daemon.endpointFor(tag), err, service.InterfaceNames)
 		}
 
 		if spec.Render != nil {
@@ -188,7 +189,7 @@ func newUnaryCallCmd[C, Req, Resp any](
 	return cmd
 }
 
-func wrapCallError(role string, tag instance.Tag, endpoint string, err error) error {
+func wrapCallError(role string, tag instance.Tag, endpoint string, err error, ifaces func() (map[string]bool, error)) error {
 	if role == "" {
 		role = "daemon"
 	}
@@ -204,6 +205,14 @@ func wrapCallError(role string, tag instance.Tag, endpoint string, err error) er
 	// second daemon onto the held instance. Keep the endpoint and %w so -v / json carry the gRPC detail.
 	if status.Code(err) == codes.Unavailable {
 		if msg := status.Convert(err).Message(); strings.Contains(msg, "connection error") || strings.Contains(msg, "transport:") {
+			// A hard-killed daemon leaves its tunnel interface (dvpn-<instance>) up with the client's
+			// traffic still routed through it; a graceful stop tears it down. Either way, starting the
+			// service recovers and removes it, so warn when the leftover interface is present.
+			if names, nerr := ifaces(); nerr == nil && names[tag.Interface()] {
+				return fmt.Errorf("the %s service (instance %s) isn't running, but a tunnel it started (%s) is still up; start the service to recover and remove it: `sentinel-dvpnd service start --instance %s` (or run `sentinel-dvpnd run --instance %s` in a terminal) (%s): %w",
+					role, tag, tag.Interface(), tag, tag, endpoint, err)
+			}
+
 			return fmt.Errorf("the %s service (instance %s) isn't running: start it with `sentinel-dvpnd service start --instance %s` (or run `sentinel-dvpnd run --instance %s` in a terminal) (%s): %w",
 				role, tag, tag, tag, endpoint, err)
 		}
