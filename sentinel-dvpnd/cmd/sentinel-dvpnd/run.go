@@ -264,6 +264,20 @@ func runRuntime(
 		return err
 	}
 
+	if loaded.Role == config.RoleClient {
+		release, err := startTunnelGuard(loaded)
+		if err != nil {
+			log.Warn().Err(err).Msg("tunnel guard not started; a killed daemon leaves its tunnel up until the next start")
+		} else {
+			// Released only after serve has returned, i.e. after the daemon's own teardown.
+			defer func() {
+				if err := release(); err != nil {
+					log.Warn().Err(err).Msg("releasing the tunnel guard")
+				}
+			}()
+		}
+	}
+
 	return serve(ctx, loaded, rt, reg, roleReg, log, ready)
 }
 
