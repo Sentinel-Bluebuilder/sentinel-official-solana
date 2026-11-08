@@ -225,7 +225,7 @@ func ownsImage(image, binary string, started, written time.Time) bool {
 		return false
 	}
 
-	path, err := LookPath(binary)
+	path, err := resolveForMatch(binary)
 
 	return err == nil && strings.EqualFold(filepath.Clean(image), filepath.Clean(path))
 }
@@ -252,7 +252,7 @@ func ownsPID(ctx context.Context, pid int, identity processIdentity) (bool, erro
 		return true, nil
 	}
 
-	path, err := LookPath(identity.binary)
+	path, err := resolveForMatch(identity.binary)
 	if err != nil {
 		return false, fmt.Errorf("resolving managed executable: %w", err)
 	}
