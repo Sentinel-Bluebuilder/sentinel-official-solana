@@ -101,6 +101,7 @@ func TestServe_MetricsBindFailureFailsBeforeReady(t *testing.T) {
 
 // ─── A client that starts without the RPC (private I#17) ───
 
+// unreachableLoaded pins the build identity, a package global: its callers must not run in parallel.
 func unreachableLoaded(t *testing.T, role string) *config.Loaded {
 	t.Helper()
 
@@ -124,7 +125,8 @@ func unreachableLoaded(t *testing.T, role string) *config.Loaded {
 }
 
 func TestPrepareStart_ClientServesWhenTheRPCIsUnreachable(t *testing.T) {
-	t.Parallel()
+	// Not parallel: unreachableLoaded pins the build identity (version.ProgramID/Mint, package
+	// globals), which other tests here read through version.Current() (-race on the stack).
 
 	loaded := unreachableLoaded(t, config.RoleClient)
 
@@ -134,7 +136,8 @@ func TestPrepareStart_ClientServesWhenTheRPCIsUnreachable(t *testing.T) {
 }
 
 func TestPrepareStart_NodeStillFailsWhenTheRPCIsUnreachable(t *testing.T) {
-	t.Parallel()
+	// Not parallel: unreachableLoaded pins the build identity (version.ProgramID/Mint, package
+	// globals), which other tests here read through version.Current() (-race on the stack).
 
 	loaded := unreachableLoaded(t, config.RoleNode)
 
@@ -144,7 +147,8 @@ func TestPrepareStart_NodeStillFailsWhenTheRPCIsUnreachable(t *testing.T) {
 }
 
 func TestPrepareStart_ClientWithAnInvalidRPCConfigStillFails(t *testing.T) {
-	t.Parallel()
+	// Not parallel: unreachableLoaded pins the build identity (version.ProgramID/Mint, package
+	// globals), which other tests here read through version.Current() (-race on the stack).
 
 	loaded := unreachableLoaded(t, config.RoleClient)
 	loaded.File.RPC.URL = ""
@@ -156,7 +160,8 @@ func TestPrepareStart_ClientWithAnInvalidRPCConfigStillFails(t *testing.T) {
 }
 
 func TestWaitForChainAccess_StopsTheDaemonWhenTheRPCAnswersButACheckFails(t *testing.T) {
-	t.Parallel()
+	// Not parallel: unreachableLoaded pins the build identity (version.ProgramID/Mint, package
+	// globals), which other tests here read through version.Current() (-race on the stack).
 
 	fakeRPC := sdktest.NewFakeRPC(t)
 	sdktest.PinBuildIdentity(t, dvpn.ProgramID, solana.PublicKey{1})
@@ -196,7 +201,8 @@ func TestWaitForChainAccess_StopsTheDaemonWhenTheRPCAnswersButACheckFails(t *tes
 }
 
 func TestWaitForChainAccess_ReturnsWhenTheDaemonStops(t *testing.T) {
-	t.Parallel()
+	// Not parallel: unreachableLoaded pins the build identity (version.ProgramID/Mint, package
+	// globals), which other tests here read through version.Current() (-race on the stack).
 
 	loaded := unreachableLoaded(t, config.RoleClient)
 
