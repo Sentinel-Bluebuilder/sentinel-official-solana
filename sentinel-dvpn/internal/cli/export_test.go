@@ -158,6 +158,12 @@ func ToSendResult(receipt *tx.Receipt) any {
 	return toSendResult(receipt)
 }
 
-func WrapCallError(role, endpoint string, err error) error {
-	return wrapCallError(role, endpoint, err)
+func WrapCallError(role string, tag instance.Tag, endpoint string, err error) error {
+	return wrapCallError(role, tag, endpoint, err)
 }
+
+func PreflightEndpoint(ctx context.Context, endpoint string) error {
+	return preflightEndpoint(ctx, endpoint)
+}
+
+var ErrDaemonNotRunning = errDaemonNotRunning

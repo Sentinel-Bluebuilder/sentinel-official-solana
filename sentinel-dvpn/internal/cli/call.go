@@ -26,6 +26,8 @@ const (
 
 var errRoleNotServed = errors.New("role is not served")
 
+var errDaemonNotRunning = errors.New("daemon not running")
+
 type callSpec[Resp any] struct {
 	AddFlags func(*pflag.FlagSet)
 	Args     cobra.PositionalArgs
@@ -79,13 +81,17 @@ func newStreamCallCmd[C, Req, Resp any](
 
 		conn, err := daemon.Dial(ctx, tag)
 		if err != nil {
-			return err
+			return wrapCallError(spec.Role, tag, daemon.endpointFor(tag), err)
 		}
 		defer func() { _ = conn.Close() }()
 
+		if err := preflightEndpoint(ctx, daemon.endpointFor(tag)); err != nil {
+			return wrapCallError(spec.Role, tag, daemon.endpointFor(tag), err)
+		}
+
 		stream, err := open(newClient(conn), ctx, req)
 		if err != nil {
-			return wrapCallError(spec.Role, daemon.endpointFor(tag), err)
+			return wrapCallError(spec.Role, tag, daemon.endpointFor(tag), err)
 		}
 
 		for {
@@ -95,7 +101,7 @@ func newStreamCallCmd[C, Req, Resp any](
 			}
 
 			if err != nil {
-				return wrapCallError(spec.Role, daemon.endpointFor(tag), err)
+				return wrapCallError(spec.Role, tag, daemon.endpointFor(tag), err)
 			}
 
 			var result any = resp
@@ -156,13 +162,17 @@ func newUnaryCallCmd[C, Req, Resp any](
 
 		conn, err := daemon.Dial(ctx, tag)
 		if err != nil {
-			return err
+			return wrapCallError(spec.Role, tag, daemon.endpointFor(tag), err)
 		}
 		defer func() { _ = conn.Close() }()
 
+		if err := preflightEndpoint(ctx, daemon.endpointFor(tag)); err != nil {
+			return wrapCallError(spec.Role, tag, daemon.endpointFor(tag), err)
+		}
+
 		resp, err := call(newClient(conn), ctx, req)
 		if err != nil {
-			return wrapCallError(spec.Role, daemon.endpointFor(tag), err)
+			return wrapCallError(spec.Role, tag, daemon.endpointFor(tag), err)
 		}
 
 		if spec.Render != nil {
@@ -187,7 +197,7 @@ func newUnaryCallCmd[C, Req, Resp any](
 	return cmd
 }
 
-func wrapCallError(role, endpoint string, err error) error {
+func wrapCallError(role string, tag instance.Tag, endpoint string, err error) error {
 	if role == "" {
 		role = "daemon"
 	}
@@ -196,8 +206,11 @@ func wrapCallError(role, endpoint string, err error) error {
 		return fmt.Errorf("%s %w: %w", role, errRoleNotServed, err)
 	}
 
-	if status.Code(err) == codes.Unavailable {
-		return fmt.Errorf("calling daemon at %s: %w", endpoint, err)
+	// A down daemon: say so plainly and how to start it, keeping the endpoint and wrapping the raw
+	// error so -v / json still carry the gRPC detail. errDaemonNotRunning is the fast pre-flight path.
+	if errors.Is(err, errDaemonNotRunning) || status.Code(err) == codes.Unavailable {
+		return fmt.Errorf("the %s service (instance %s) isn't running: start it with `sentinel-dvpnd run --instance %s` (%s): %w",
+			role, tag, tag, endpoint, err)
 	}
 
 	return fmt.Errorf("calling daemon: %w", err)

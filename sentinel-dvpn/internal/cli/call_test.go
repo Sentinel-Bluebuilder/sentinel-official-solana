@@ -2,6 +2,7 @@ package cli_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -243,7 +244,12 @@ func TestWrapCallError(t *testing.T) {
 		{
 			err:  status.Error(codes.Unavailable, "connection refused"),
 			name: "unavailable",
-			want: "calling daemon at /tmp/daemon.sock: rpc error: code = Unavailable desc = connection refused",
+			want: "the node service (instance c0) isn't running: start it with `sentinel-dvpnd run --instance c0` (/tmp/daemon.sock): rpc error: code = Unavailable desc = connection refused",
+		},
+		{
+			err:  fmt.Errorf("%w: connect: no such file", cli.ErrDaemonNotRunning),
+			name: "not_running",
+			want: "the node service (instance c0) isn't running: start it with `sentinel-dvpnd run --instance c0` (/tmp/daemon.sock): daemon not running: connect: no such file",
 		},
 		{
 			err:  status.Error(codes.Internal, "boom"),
@@ -256,7 +262,7 @@ func TestWrapCallError(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := cli.WrapCallError("node", "/tmp/daemon.sock", tc.err)
+			got := cli.WrapCallError("node", instance.Tag("c0"), "/tmp/daemon.sock", tc.err)
 			require.EqualError(t, got, tc.want)
 		})
 	}

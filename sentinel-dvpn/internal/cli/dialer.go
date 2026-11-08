@@ -13,8 +13,9 @@ import (
 )
 
 const (
-	keepaliveTime    = 10 * time.Second
-	keepaliveTimeout = 20 * time.Second
+	keepaliveTime        = 10 * time.Second
+	preflightDialTimeout = 500 * time.Millisecond
+	keepaliveTimeout     = 20 * time.Second
 )
 
 type dialer struct {
