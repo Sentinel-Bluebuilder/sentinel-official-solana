@@ -197,9 +197,15 @@ func runStartChecks(
 	log zerolog.Logger,
 ) error {
 	delay := minDelay
+	started := time.Now()
 
-	for {
+	for attempt := 1; ; attempt++ {
 		err := checks(ctx)
+		if err == nil && attempt > 1 {
+			log.Info().Int("attempts", attempt).Dur("waited", time.Since(started).Round(time.Second)).
+				Msg("rpc answered; start checks passed")
+		}
+
 		if err == nil || !wait || !errors.Is(err, preflight.ErrRPCUnreachable) {
 			return err
 		}
