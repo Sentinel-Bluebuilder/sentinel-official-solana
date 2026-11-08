@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"time"
 
@@ -15,6 +16,8 @@ import (
 
 	"github.com/sentinel-official/sentinel-go-sdk/v3/paymaster"
 	"github.com/sentinel-official/sentinel-go-sdk/v3/program"
+	"github.com/sentinel-official/sentinel-go-sdk/v3/service"
+	"github.com/sentinel-official/sentinel-go-sdk/v3/session"
 	"github.com/sentinel-official/sentinel-go-sdk/v3/tx"
 	"github.com/sentinel-official/sentinel-programs/clients/go/core"
 	"github.com/sentinel-official/sentinel-programs/clients/go/dvpn"
@@ -61,7 +64,52 @@ func (r *Runtime) channelClaim(ctx context.Context, position *Position) uint64 {
 		settled = position.Settled
 	}
 
-	return min(position.Cumulative, settled)
+	delivered, err := r.deliveredOwed(ctx, position)
+	if err != nil {
+		r.log.Warn().Err(err).Str("position", position.Address).Msg("adding up delivered usage; claiming the settled amount")
+	}
+
+	return min(position.Cumulative, max(settled, delivered))
+}
+
+// deliveredOwed is what this position's sessions owe for everything the node delivered. A session
+// settles only up to the credit accepted when it closes, so traffic the node let through between
+// "credit exhausted" and the cut is left out of settled. A voucher the client signs afterwards can
+// still cover it, and min(cumulative, ...) in channelClaim never claims more than the client signed.
+// Only sessions opened since this position opened count, so a reused channel address starts fresh.
+func (r *Runtime) deliveredOwed(ctx context.Context, position *Position) (uint64, error) {
+	var sessions []Session
+	if err := r.db.WithContext(ctx).
+		Where("subject = ? AND created_unix >= ?", position.Address, position.OpenedUnix).
+		Find(&sessions).Error; err != nil {
+		return 0, fmt.Errorf("loading position sessions: %w", err)
+	}
+
+	now := time.Now().Unix()
+
+	var owed uint64
+
+	for i := range sessions {
+		sess := sessions[i]
+		if sess.Status == SessionStatusActive {
+			if stats, err := r.service.PeerStats(ctx, service.PeerID(sess.PeerID)); err == nil {
+				foldStats(&sess, stats, now)
+			}
+
+			sess.Seconds = uint64(max(now-sess.CreatedUnix, 0))
+		}
+
+		basis := session.Basis(sess.Basis)
+
+		add := session.Owed(basis, sess.Price, sess.Usage().Amount(basis))
+		if add > math.MaxUint64-owed {
+			return math.MaxUint64, nil
+		}
+
+		owed += add
+	}
+
+	return owed, nil
 }
 
 // anchorInstructionFallbackNotFound is Anchor's error for an instruction the deployed program does
