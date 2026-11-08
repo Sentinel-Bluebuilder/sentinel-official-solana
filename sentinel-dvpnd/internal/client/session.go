@@ -24,13 +24,6 @@ const (
 	reasonNodeOvercharging = "node overcharging"
 	reasonStatsUnavailable = "service stats unavailable"
 	reasonStoppedByUser    = "stopped by user"
-	// reasonPathStopped: the fork ends a dead data path with this (Q0366) after a failed redial; kept
-	// here so keepsFirewall matches the fork exactly. On this base the reconnect loop handles a dead
-	// path and the end arrives as connection lost / service stats unavailable, which keepsFirewall holds.
-	reasonPathStopped = "the connection to this server stopped working"
-	// reasonUsageUnconfirmed: referenced by keepsFirewall for parity with the fork (Q0195); base does
-	// not yet produce it, but the kill-switch rule is identical.
-	reasonUsageUnconfirmed = "node usage unconfirmed: local counter stalled"
 )
 
 var (
@@ -477,7 +470,7 @@ func (r *Runtime) watch(sessionID string) (*watcher, *Session) {
 }
 
 // keepsFirewall decides whether a session end KEEPS the kill-switch block in place. Ported from the
-// fork (Q0256 owner decision, 2026-10-29): "on" keeps the block when billing ends too (escrow
+// product decision: with "on", a session that ends for a reason the user did not ask for keeps the
 // exhausted, node overcharging, the node closing or forgetting the session, a daemon restart) — no
 // lift, no leak. Only the user (Disconnect / Restore network), a daemon stop (persist keeps even
 // that) and kill switch off lift it. "persist" keeps the block for every end the user did not ask for.
@@ -487,7 +480,7 @@ func keepsFirewall(reason, killSwitch string) bool {
 	}
 
 	switch reason {
-	case reasonConnectionLost, reasonPathStopped, reasonStatsUnavailable, reasonUsageUnconfirmed:
+	case reasonConnectionLost, reasonStatsUnavailable:
 		return true
 	case reasonDaemonStopping:
 		return killSwitch == config.KillSwitchPersist

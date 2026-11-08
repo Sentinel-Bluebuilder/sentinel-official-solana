@@ -13,7 +13,7 @@ import (
 	"github.com/sentinel-official/sentinel-go-sdk/v3/sdktest"
 )
 
-// Q0353 (u24b deb12, hysteria2, kill switch on, NIC flap): the session ended without a Disconnect
+// A NIC flap with the kill switch on: the session ended without a Disconnect
 // and traffic left directly. With the kill switch on, exhausted reconnects released the block
 // (only "persist" kept it). The contract: on or persist, only the user's Disconnect lifts it.
 func TestRuntime_ReconnectExhausted_KillSwitchStaysUntilDisconnect(t *testing.T) {
@@ -33,7 +33,7 @@ func TestRuntime_ReconnectExhausted_KillSwitchStaysUntilDisconnect(t *testing.T)
 			require.Never(t, func() bool { return fw.flushes() > 0 }, 3*time.Second, 10*time.Millisecond,
 				"a session that ended without Disconnect must keep the kill switch (fail closed)")
 
-			_ = client.StopSession(t.Context(), rt) // no live session any more: only the block is left
+			require.NoError(t, client.StopSession(t.Context(), rt)) // no live session any more: only the block is left
 			require.Eventually(t, func() bool { return fw.flushes() >= 1 }, 3*time.Second, 10*time.Millisecond,
 				"the user's Disconnect removes it")
 		})

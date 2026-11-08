@@ -269,9 +269,10 @@ func (r *Runtime) reconnect(
 		return nil, false
 	}
 
-	// Q0353/I#27: a kill switch of "on" (or "persist") must FAIL CLOSED when reconnecting gives up —
+	// A kill switch of "on" (or "persist") must FAIL CLOSED when reconnecting gives up —
 	// releasing it here left traffic going direct to the open internet while the tunnel was down (proven
-	// live: cut90_ks leaked real handshakes + inbound data on every protocol). Only "off" lifts the
+	// live: a link cut with the kill switch on leaked real handshakes + inbound data on every
+	// protocol). Only "off" lifts the
 	// reconnect hold; "on"/"persist" keep blocking until the user disconnects.
 	if r.cfg.Network.KillSwitch == config.KillSwitchOff {
 		if _, err := r.releaseFirewall(ctx, false); err != nil {

@@ -14,7 +14,7 @@ import (
 	"github.com/sentinel-official/sentinel-go-sdk/v3/session"
 )
 
-// Q0353/I#27 (u22, hysteria2, kill switch on): killing the tunnel process mid-transfer ended the
+// Killing the tunnel process mid-transfer with the kill switch on ended the
 // session with a node reason and traffic went direct straightaway. A node-initiated end (here an
 // overcharge abort) must NOT lift the kill switch when it is on/persist; only the user's own
 // disconnect does. This exercises the teardown() release path, distinct from exhausted reconnect.
