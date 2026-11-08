@@ -35,6 +35,8 @@ type Server struct {
 	mu         sync.Mutex
 	peers      *service.Peers[struct{}]
 	placement  service.Placement
+	fwBackend  string
+	run        runFunc
 	process    *service.ProcessManager
 	statsAddr  string
 	tlsPin     string
@@ -71,6 +73,7 @@ func newServer(
 		peers:     service.NewPeers[struct{}](),
 		placement: p,
 		process:   service.NewProcessManager(binary, p.Dir, log, opts...),
+		run:       defaultRun,
 		statsAddr: statsAddr,
 	}, nil
 }
@@ -265,6 +268,22 @@ func (s *Server) Start(ctx context.Context) error {
 		return err
 	}
 
+	backend, err := openInboundUDP(ctx, s.run, s.cfg.ListenPort, s.log)
+	if err != nil {
+		stopCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), service.FailedStartStopTimeout)
+		defer cancel()
+
+		_ = s.process.Terminate(stopCtx)
+
+		if shutdownErr := s.authServer.Shutdown(stopCtx); shutdownErr != nil {
+			err = errors.Join(err, fmt.Errorf("stopping auth server: %w", shutdownErr))
+		}
+
+		return err
+	}
+
+	s.fwBackend = backend
+
 	succeeded = true
 
 	s.log.Info().Str("process", binary).Msg("service started")
@@ -284,6 +303,14 @@ func (s *Server) Stop(ctx context.Context) error {
 			errs = append(errs, err)
 		} else if err := service.RemoveOwned(s.placement.ToolDir, s.placement.Interface); err != nil {
 			errs = append(errs, err)
+		}
+
+		if s.fwBackend != "" {
+			if err := closeInboundUDP(ctx, s.run, s.fwBackend, s.cfg.ListenPort, s.log); err != nil {
+				errs = append(errs, err)
+			} else {
+				s.fwBackend = ""
+			}
 		}
 
 		if err := s.authServer.Shutdown(ctx); err != nil {
