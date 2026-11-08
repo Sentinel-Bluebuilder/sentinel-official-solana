@@ -130,6 +130,14 @@ var (
 		HTTPStatus: http.StatusTooManyRequests,
 		Message:    "rate limited",
 	}
+	// ErrChainBusy: the node could not read the chain because its RPC is rate limiting it or failing.
+	// It keeps the rate_limited code (no new wire code), so a client's transport retries it like any
+	// 429, and the message says what happened in plain words.
+	ErrChainBusy = &Error{
+		Code:       CodeRateLimited,
+		HTTPStatus: http.StatusTooManyRequests,
+		Message:    "the node's network service is busy, try again",
+	}
 	ErrRequestTooLarge = &Error{
 		Code:       CodeRequestTooLarge,
 		HTTPStatus: http.StatusRequestEntityTooLarge,
