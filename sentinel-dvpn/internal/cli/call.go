@@ -205,9 +205,12 @@ func wrapCallError(role string, tag instance.Tag, endpoint string, err error, if
 	// second daemon onto the held instance. Keep the endpoint and %w so -v / json carry the gRPC detail.
 	if status.Code(err) == codes.Unavailable {
 		if msg := status.Convert(err).Message(); strings.Contains(msg, "connection error") || strings.Contains(msg, "transport:") {
-			// A hard-killed daemon leaves its tunnel interface (dvpn-<instance>) up with the client's
-			// traffic still routed through it; a graceful stop tears it down. Either way, starting the
-			// service recovers and removes it, so warn when the leftover interface is present.
+			// A hard-killed daemon leaves its tunnel interface (dvpn-<instance>) up with routes still
+			// pointing into it; a graceful stop tears it down. Either way, starting the service recovers
+			// and removes it, so warn when the leftover interface is present. This matches only the
+			// dvpn-<instance> name the daemon assigns (WireGuard/AWG on Linux and Windows, and hysteria2
+			// where the daemon names the tun). A kernel-named interface (macOS utun, or an OpenVPN /
+			// detected name) is not matched here; the daemon's restart recovery still removes those.
 			if names, nerr := ifaces(); nerr == nil && names[tag.Interface()] {
 				return fmt.Errorf("the %s service (instance %s) isn't running, but a tunnel it started (%s) is still up; start the service to recover and remove it: `sentinel-dvpnd service start --instance %s` (or run `sentinel-dvpnd run --instance %s` in a terminal) (%s): %w",
 					role, tag, tag.Interface(), tag, tag, endpoint, err)
