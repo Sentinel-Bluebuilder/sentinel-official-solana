@@ -392,6 +392,9 @@ func TestRuntime_Redeem_ConcurrentPassesRedeemOnce(t *testing.T) {
 	address := seedChannel(t, r, home, home.OwnerKey, dvpn.PositionModeVoucher)
 	cumulative := home.Loaded.Node.Redeem.ThresholdBaseUnits * 2
 	seedPosition(t, r, home, address, cumulative)
+	// Settled up to the voucher, so the whole amount is due whichever way the claim is measured.
+	require.NoError(t, home.DB.Model(&node.Position{}).Where("address = ?", address.String()).
+		Update("settled", cumulative).Error)
 
 	// The hourly job, position sync and RedeemNow all call the same pass; start four at once.
 	const passes = 4
