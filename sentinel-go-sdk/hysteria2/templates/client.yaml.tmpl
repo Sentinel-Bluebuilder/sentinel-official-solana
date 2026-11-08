@@ -17,7 +17,7 @@ tls:
     ipv4:
       - 0.0.0.0/0
     ipv6:
-      - ::/0
+      - {{ .RouteV6 }}
 {{ if or .ExcludeV4 .LocalV4 }}    ipv4Exclude:
 {{ if .ExcludeV4 }}      - "{{ .ExcludeV4 }}"
 {{ end }}{{ range .LocalV4 }}      - "{{ . }}"

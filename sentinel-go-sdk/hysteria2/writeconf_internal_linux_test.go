@@ -17,7 +17,7 @@ func TestWriteConf_ExcludesTheMachinesOwnNetworks(t *testing.T) {
 
 	path := filepath.Join(t.TempDir(), "client.yaml")
 	server := netip.MustParseAddr("203.0.113.7")
-	require.NoError(t, writeConf(path, server, "dvpn-test", PeerResponse{Auth: "a", Port: 443, TLSPin: "p"}))
+	require.NoError(t, writeConf(path, server, "dvpn-test", PeerResponse{Auth: "a", Port: 443, TLSPin: "p"}, false))
 
 	b, err := os.ReadFile(path)
 	require.NoError(t, err)
