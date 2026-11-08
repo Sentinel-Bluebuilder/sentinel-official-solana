@@ -62,6 +62,7 @@ type Runtime struct {
 	reconnectAttempts      uint
 	reconnectBackoff       time.Duration
 	recovered              atomic.Bool
+	removeCopies           func([]string, string) error
 	remover                leftover.InterfaceRemover
 	rpcCfg                 cli.RPCConfig
 	sampleInterval         time.Duration
@@ -212,6 +213,7 @@ func New(
 		programClient:          programClient,
 		reconnectAttempts:      reconnectAttempts,
 		reconnectBackoff:       reconnectBackoff,
+		removeCopies:           leftover.RemoveCopies,
 		remover:                leftover.NewRemover(),
 		rpcCfg:                 loaded.File.RPC,
 		sampleInterval:         sampleInterval,
