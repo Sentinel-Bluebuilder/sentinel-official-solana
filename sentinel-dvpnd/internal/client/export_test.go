@@ -200,3 +200,9 @@ func StopSession(ctx context.Context, r *Runtime) error {
 func VerifyLedger(r *Runtime, ch *Channel, view nodeapi.Position, terms session.Terms, settledBound uint64) error {
 	return r.verifyLedger(ch, view, terms, settledBound)
 }
+
+func ResolveHost(ctx context.Context, r *Runtime, host string) ([]netip.Addr, error) {
+	return r.resolveHost(ctx, host)
+}
+
+var ErrNodeNotAdmitted = errNodeNotAdmitted

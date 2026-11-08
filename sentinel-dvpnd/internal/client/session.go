@@ -24,6 +24,8 @@ const (
 	reasonNodeOvercharging = "node overcharging"
 	reasonStatsUnavailable = "service stats unavailable"
 	reasonStoppedByUser    = "stopped by user"
+	// reasonSwitching: StopSession with keep_kill_switch; a new session follows at once.
+	reasonSwitching = "switching servers"
 )
 
 var (
@@ -302,6 +304,12 @@ func (r *Runtime) stopSession(ctx context.Context, reason string) (stopResult, e
 	return r.stopSessionByID(ctx, reason, "")
 }
 
+// keepsBlockForSwitch: a stop for a server switch keeps the kill switch in place (when it is on),
+// so nothing leaves outside the tunnel before the next session takes the block over.
+func (r *Runtime) keepsBlockForSwitch(reason string) bool {
+	return reason == reasonSwitching && r.cfg.Network.KillSwitch != config.KillSwitchOff
+}
+
 func (r *Runtime) stopSessionByID(ctx context.Context, reason, id string) (stopResult, error) {
 	conn, turn, takeErr := r.takeConnection(reason, id)
 	if takeErr != nil {
@@ -326,6 +334,10 @@ func (r *Runtime) stopSessionByID(ctx context.Context, reason, id string) (stopR
 
 		if dnsPending {
 			result.dnsRevertFailed = r.revertDNS(ctx) != nil
+		}
+
+		if present && r.keepsBlockForSwitch(reason) {
+			return // a block held with no session (e.g. after a lost connection) stays for the switch
 		}
 
 		if !present || reason == reasonDaemonStopping {
@@ -401,7 +413,7 @@ func (r *Runtime) teardown(ctx context.Context, conn *connection, reason string)
 
 	result.dnsRevertFailed = r.revertDNS(ctx) != nil
 
-	if reason != reasonConnectionLost &&
+	if reason != reasonConnectionLost && !r.keepsBlockForSwitch(reason) &&
 		(reason != reasonDaemonStopping || r.cfg.Network.KillSwitch != config.KillSwitchPersist) {
 		released, err := r.releaseFirewall(ctx, false)
 		if err != nil {

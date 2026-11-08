@@ -118,7 +118,20 @@ func (g *grpcServer) StopSession(
 		return nil, daemonv1.ToStatus(fmt.Errorf("%w: %w", daemonv1.ErrUnavailable, errRecoveryPending))
 	}
 
-	result, err := g.runtime.stopSessionByID(ctx, reasonStoppedByUser, req.GetId())
+	reason := reasonStoppedByUser
+	if req.GetKeepKillSwitch() {
+		reason = reasonSwitching
+
+		// Before the stop: the next node is resolved through the tunnel still up. On failure the
+		// session stays as it is, and the caller learns the switch cannot go ahead.
+		if next := req.GetNextNode(); next != "" {
+			if err := g.runtime.admitNextNode(ctx, next); err != nil {
+				return nil, daemonv1.ToStatus(fmt.Errorf("admitting the next node to the kill switch: %w", err))
+			}
+		}
+	}
+
+	result, err := g.runtime.stopSessionByID(ctx, reason, req.GetId())
 
 	switch {
 	case errors.Is(err, errMissingSession):
