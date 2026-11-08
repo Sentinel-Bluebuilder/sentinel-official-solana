@@ -376,6 +376,21 @@ func (r *Runtime) teardown(ctx context.Context, conn *connection, reason string)
 
 	sessionID := conn.session.ID
 
+	// A session tearing down reads "closing" (the app shows "Disconnecting"), not "active", for the
+	// whole teardown -- OpenVPN's slow close keeps stopService busy ~15 s. Persist + notify before the slow
+	// closeRemoteSession/stopService so ListSessions (a DB poll) and watchers (the stream) both see it.
+	if sessionID != "" {
+		r.mu.Lock()
+		conn.session.Status = SessionStatusClosing
+		conn.session.UpdatedUnix = time.Now().Unix()
+		snapshot := conn.session
+		r.mu.Unlock()
+		if err := r.save(ctx, &snapshot); err != nil {
+			r.log.Warn().Err(err).Msg("marking the session closing during teardown")
+		}
+		r.notify(&snapshot)
+	}
+
 	closed := conn.remoteClosed
 	if conn.nodeClient != nil {
 		closed = r.closeRemoteSession(ctx, conn.nodeClient, sessionID) || closed
