@@ -1,6 +1,7 @@
 package cli_test
 
 import (
+	"bytes"
 	"context"
 	"testing"
 	"time"
@@ -243,7 +244,7 @@ func TestWrapCallError(t *testing.T) {
 		{
 			err:  status.Error(codes.Unavailable, `connection error: desc = "transport: Error while dialing: dial unix /tmp/daemon.sock: connect: no such file or directory"`),
 			name: "unavailable_transport",
-			want: "the node service (instance c0) isn't running: start it with `sentinel-dvpnd service start --instance c0` (or run `sentinel-dvpnd run --instance c0` in a terminal) (/tmp/daemon.sock): rpc error: code = Unavailable desc = connection error: desc = \"transport: Error while dialing: dial unix /tmp/daemon.sock: connect: no such file or directory\"",
+			want: "the node service (instance c0) isn't running: start it with `sentinel-dvpnd service start --instance c0` (or run `sentinel-dvpnd run --instance c0` in a terminal) (/tmp/daemon.sock)",
 		},
 		{
 			err:  status.Error(codes.Unavailable, "unavailable: the kill switch and sessions a previous run left are still being recovered"),
@@ -263,6 +264,7 @@ func TestWrapCallError(t *testing.T) {
 
 			got := cli.WrapCallError("node", instance.Tag("c0"), "/tmp/daemon.sock", tc.err, func() (map[string]bool, error) { return nil, nil }, func() string { return "" })
 			require.EqualError(t, got, tc.want)
+			require.Equal(t, status.Code(tc.err), status.Code(got), "the gRPC code stays readable through the wrap")
 		})
 	}
 }
@@ -274,7 +276,8 @@ func TestWrapCallError_LeftoverTunnel(t *testing.T) {
 	up := func() (map[string]bool, error) { return map[string]bool{"dvpn-c0": true}, nil }
 
 	got := cli.WrapCallError("node", instance.Tag("c0"), "/tmp/daemon.sock", transportErr, up, func() string { return "" })
-	require.EqualError(t, got, "the node service (instance c0) isn't running, but a tunnel it started (dvpn-c0) is still up; start the service to recover and remove it: `sentinel-dvpnd service start --instance c0` (or run `sentinel-dvpnd run --instance c0` in a terminal) (/tmp/daemon.sock): rpc error: code = Unavailable desc = connection error: desc = \"transport: Error while dialing: dial unix /tmp/daemon.sock: connect: no such file or directory\"")
+	require.EqualError(t, got, "the node service (instance c0) isn't running, but a tunnel it started (dvpn-c0) is still up; start the service to recover and remove it: `sentinel-dvpnd service start --instance c0` (or run `sentinel-dvpnd run --instance c0` in a terminal) (/tmp/daemon.sock)")
+	require.ErrorIs(t, got, transportErr, "the raw error stays in the chain")
 }
 
 func TestWrapCallError_LeftoverTunnel_LiveName(t *testing.T) {
@@ -287,7 +290,7 @@ func TestWrapCallError_LeftoverTunnel_LiveName(t *testing.T) {
 	live := func() string { return "utun7" }
 
 	got := cli.WrapCallError("node", instance.Tag("c0"), "/tmp/daemon.sock", transportErr, up, live)
-	require.EqualError(t, got, "the node service (instance c0) isn't running, but a tunnel it started (utun7) is still up; start the service to recover and remove it: `sentinel-dvpnd service start --instance c0` (or run `sentinel-dvpnd run --instance c0` in a terminal) (/tmp/daemon.sock): rpc error: code = Unavailable desc = connection error: desc = \"transport: Error while dialing: dial unix /tmp/daemon.sock: connect: no such file or directory\"")
+	require.EqualError(t, got, "the node service (instance c0) isn't running, but a tunnel it started (utun7) is still up; start the service to recover and remove it: `sentinel-dvpnd service start --instance c0` (or run `sentinel-dvpnd run --instance c0` in a terminal) (/tmp/daemon.sock)")
 }
 
 func TestWrapCallError_LeftoverTunnel_StaleGone(t *testing.T) {
@@ -300,5 +303,24 @@ func TestWrapCallError_LeftoverTunnel_StaleGone(t *testing.T) {
 	live := func() string { return "utun7" }
 
 	got := cli.WrapCallError("node", instance.Tag("c0"), "/tmp/daemon.sock", transportErr, up, live)
-	require.EqualError(t, got, "the node service (instance c0) isn't running: start it with `sentinel-dvpnd service start --instance c0` (or run `sentinel-dvpnd run --instance c0` in a terminal) (/tmp/daemon.sock): rpc error: code = Unavailable desc = connection error: desc = \"transport: Error while dialing: dial unix /tmp/daemon.sock: connect: no such file or directory\"")
+	require.EqualError(t, got, "the node service (instance c0) isn't running: start it with `sentinel-dvpnd service start --instance c0` (or run `sentinel-dvpnd run --instance c0` in a terminal) (/tmp/daemon.sock)")
+}
+
+// A command run while its daemon is stopped printed the plain "isn't running" line followed by the raw
+// gRPC dial error. The line is now plain words only; the raw error is logged at debug.
+func TestDialer_CallError_PlainWordsAndTheRawErrorAtDebug(t *testing.T) {
+	t.Parallel()
+
+	raw := status.Error(codes.Unavailable,
+		`connection error: desc = "transport: Error while dialing: dial unix /tmp/daemon.sock: connect: connection refused"`)
+
+	var logged bytes.Buffer
+
+	got := cli.CallError(&logged, "/tmp/daemon.sock", "client", instance.Tag("c0"), raw)
+
+	require.EqualError(t, got, "the client service (instance c0) isn't running: start it with "+
+		"`sentinel-dvpnd service start --instance c0` (or run `sentinel-dvpnd run --instance c0` in a terminal) (/tmp/daemon.sock)")
+	require.NotContains(t, got.Error(), "rpc error")
+	require.ErrorIs(t, got, raw, "the raw error stays in the chain")
+	require.Contains(t, logged.String(), "connection refused", "the raw error is in the debug log")
 }
