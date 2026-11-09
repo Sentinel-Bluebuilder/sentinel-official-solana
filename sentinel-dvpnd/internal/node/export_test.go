@@ -180,3 +180,5 @@ func SetStartChainRetry(first, maxDelay time.Duration) (restore func()) {
 
 	return func() { startChainRetryFirst, startChainRetryMax = oldFirst, oldMax }
 }
+
+func ChainUnavailable(err error) bool { return chainUnavailable(err) }
