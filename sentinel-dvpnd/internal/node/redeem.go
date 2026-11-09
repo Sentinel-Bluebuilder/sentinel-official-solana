@@ -225,6 +225,12 @@ func (r *Runtime) redeem(ctx context.Context) error { return r.redeemPositions(c
 func (r *Runtime) redeemNow(ctx context.Context) error { return r.redeemPositions(ctx, true) }
 
 func (r *Runtime) redeemPositions(ctx context.Context, force bool) error {
+	// One pass at a time. The hourly job, position sync and RedeemNow can overlap, and two passes over the same due
+	// positions build the same transaction (same subjects, voucher and recent blockhash), so the second save fails
+	// on the signature's unique key and leaves that batch due. A pass that waits here reads the advanced positions.
+	r.redeemMu.Lock()
+	defer r.redeemMu.Unlock()
+
 	skip, err := r.resolvePendingRedemptions(ctx)
 	if err != nil {
 		return err
