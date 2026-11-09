@@ -227,8 +227,9 @@ func TestRuntime_RedeemNow_ClaimsBelowThresholdAtOnce(t *testing.T) {
 	address := seedChannel(t, r, home, home.OwnerKey, dvpn.PositionModeVoucher)
 	cumulative := home.Loaded.Node.Redeem.ThresholdBaseUnits / 2
 	seedPosition(t, r, home, address, cumulative)
+	// Settled up to the voucher, so the whole amount is due whichever way the claim is measured.
 	require.NoError(t, home.DB.Model(&node.Position{}).Where("address = ?", address.String()).
-		Update("accepted_unix", time.Now().Unix()).Error)
+		Updates(map[string]any{"accepted_unix": time.Now().Unix(), "settled": cumulative}).Error)
 
 	require.NoError(t, node.Redeem(t.Context(), r))
 	require.Empty(t, home.RPC.Sent(), "the worker waits: below the threshold and under an hour old")
