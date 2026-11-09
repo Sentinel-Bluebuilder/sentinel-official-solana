@@ -114,3 +114,9 @@ func SetStartChainRetry(first, maxDelay time.Duration) (restore func()) {
 
 	return func() { startChainRetryFirst, startChainRetryMax = oldFirst, oldMax }
 }
+
+func SyncChain(ctx context.Context, r *Runtime) error {
+	_, err := r.syncChain(ctx)
+
+	return err
+}
