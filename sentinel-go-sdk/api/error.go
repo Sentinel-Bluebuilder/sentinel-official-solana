@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"slices"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -249,7 +248,7 @@ func Codes() []string {
 func ParseError(status int, body []byte) error {
 	var response ErrorResponse
 	if err := json.Unmarshal(body, &response); err != nil ||
-		!slices.Contains(Codes(), response.Error.Code) ||
+		!codePattern.MatchString(response.Error.Code) ||
 		!validMessage(response.Error.Message) {
 		return fmt.Errorf("%w %d", ErrUnexpectedStatus, status)
 	}
