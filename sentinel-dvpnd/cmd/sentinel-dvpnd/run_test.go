@@ -135,15 +135,24 @@ func TestPrepareStart_ClientServesWhenTheRPCIsUnreachable(t *testing.T) {
 	require.True(t, waits, "the startup checks must move to the background")
 }
 
-func TestPrepareStart_NodeStillFailsWhenTheRPCIsUnreachable(t *testing.T) {
+func TestPrepareStart_NodeWaitsForTheRPCAndFailsOnlyWhenTheStartIsCancelled(t *testing.T) {
 	// Not parallel: unreachableLoaded pins the build identity (version.ProgramID/Mint, package
 	// globals), which other tests here read through version.Current() (-race on the stack).
 
+	// A node waits for an unreachable RPC (it does not exit and crash-loop under its service manager); the
+	// client path serves and waits in the background instead. Only the end of the start (ctx) ends the wait,
+	// with the last error.
 	loaded := unreachableLoaded(t, config.RoleNode)
 
-	waits, err := main.PrepareStart(t.Context(), loaded, rpc.New(loaded.File.RPC.URL))
+	ctx, cancel := context.WithTimeout(t.Context(), 600*time.Millisecond)
+	defer cancel()
+
+	began := time.Now()
+	waits, err := main.PrepareStart(ctx, loaded, rpc.New(loaded.File.RPC.URL))
+
 	require.ErrorIs(t, err, preflight.ErrRPCUnreachable)
 	require.False(t, waits)
+	require.GreaterOrEqual(t, time.Since(began), 500*time.Millisecond, "the node waited instead of exiting at the first failure")
 }
 
 func TestPrepareStart_ClientWithAnInvalidRPCConfigStillFails(t *testing.T) {
