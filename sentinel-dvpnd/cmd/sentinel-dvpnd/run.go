@@ -179,13 +179,20 @@ func prepareRuntime(
 		}
 	}
 
-	err := checkChainAccess(ctx, loaded, rpcClient, pin, log)
+	// A node or provider whose RPC does not answer at start (down, or rate-limiting it) waits for it.
+	// Exiting put the daemon in a restart loop under its service manager: off-line the whole time,
+	// and adding load to the same RPC.
+	wait := loaded != nil && loaded.Role != config.RoleClient
+
+	err := runStartChecks(ctx, wait, startRetryMinDelay, startRetryMaxDelay, func(ctx context.Context) error {
+		return checkChainAccess(ctx, loaded, rpcClient, pin, log)
+	}, log)
 	if err == nil {
 		return nil, nil
 	}
 
-	// Only the client waits for the network: it has to keep serving its own control API (StopSession is what
-	// releases a kill switch held from an earlier session), and a boot without network yet is normal for it.
+	// A client does not block on the network here: it has to keep serving its own control API (StopSession is
+	// what releases a kill switch held from an earlier session), and a boot without network yet is normal for it.
 	if loaded.Role != config.RoleClient || !chainUnreachable(err) {
 		return nil, err
 	}
@@ -210,6 +217,43 @@ func checkChainAccess(
 	}
 
 	return checkWebSocket(ctx, loaded, pin)
+}
+
+const (
+	startRetryMinDelay = 2 * time.Second
+	startRetryMaxDelay = time.Minute
+)
+
+// runStartChecks runs checks; with wait it retries a preflight.ErrRPCUnreachable with back-off
+// (minDelay doubling up to maxDelay) until the checks pass, fail another way, or ctx ends.
+func runStartChecks(
+	ctx context.Context, wait bool, minDelay, maxDelay time.Duration, checks func(context.Context) error,
+	log zerolog.Logger,
+) error {
+	delay := minDelay
+	started := time.Now()
+
+	for attempt := 1; ; attempt++ {
+		err := checks(ctx)
+		if err == nil && attempt > 1 {
+			log.Info().Int("attempts", attempt).Dur("waited", time.Since(started).Round(time.Second)).
+				Msg("rpc answered; start checks passed")
+		}
+
+		if err == nil || !wait || !errors.Is(err, preflight.ErrRPCUnreachable) {
+			return err
+		}
+
+		log.Warn().Err(err).Dur("retry_in", delay).Msg("rpc unreachable at start; waiting for it")
+
+		select {
+		case <-ctx.Done():
+			return err
+		case <-time.After(delay):
+		}
+
+		delay = min(delay*2, maxDelay)
+	}
 }
 
 // chainUnreachable reports a startup failure caused only by the network: the RPC did not answer, or its
